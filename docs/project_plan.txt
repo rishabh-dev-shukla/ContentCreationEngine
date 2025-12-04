@@ -1,0 +1,15 @@
+I want to build an Automated Content Creation Engine, for creating Instagram reels on a certain given niche (lets say SAT exam preparation).
+
+This project should include an autimated workflow, which should get triggered on a schedule (say once a day at 8 AM), and should do the following tasks in sequence:
+1. Research Content Ideas: Scrape popular Instagram accounts, hashtags, and related websites to gather trending topics and content ideas in the given niche.
+2. News research: Scrape recent news articles, blogs, and social media posts related to the niche to gather fresh content ideas.
+3. Reddit research: Scrape relevant subreddits to find popular discussions and content ideas.
+4. Create 5 Content Ideas for the day: Based on the research, generate 5 unique and engaging content ideas for Instagram reels.
+5. Script Writing: For each content idea, generate a short script (around 150-200 words) that starts with a hook, followed by the main content, and ends with a call-to-action.
+6. Visual Suggestions: For each script, provide suggestions for visuals, including images, video clips, text overlays, and animations that would enhance the reel.
+
+We should use Python for this project, leveraging libraries such as BeautifulSoup or Scrapy for web scraping, and OpenAI's GPT-4 API for content generation. The scheduling can be handled using cron jobs or a task scheduler like Celery.
+
+We should also have an option to store a library of our user's previous content, so as to learn from that asn create user's persona, which can be kept in mind while writing the script, so as to maintain consistency in the content style and tone.
+
+First discuss the structure of project with me, anf when we finalize the features and structure, then only start building it

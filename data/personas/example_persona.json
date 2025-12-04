@@ -1,0 +1,73 @@
+{
+  "persona_id": "sat_prep_guru",
+  "basic_info": {
+    "name": "SAT Prep Guru",
+    "niche": "SAT Exam Preparation",
+    "target_audience": "High school students (16-18) preparing for SAT",
+    "tone": "Friendly, encouraging, slightly humorous, relatable",
+    "unique_angle": "Quick tips, shortcuts, and hacks that actually work",
+    "hashtags": ["#SATprep", "#CollegeAdmissions", "#StudyTips", "#SATtips", "#TestPrep", "#CollegeBound"],
+    "posting_frequency": "daily"
+  },
+  "style_guide": {
+    "hook_style": "Question, shocking statistic, or bold statement",
+    "content_style": "Numbered tips, fast-paced, visual demonstrations",
+    "cta_style": "Save and share focused, creates urgency",
+    "avoid": ["Complex jargon", "Negative messaging", "Overwhelming information", "Boring lecture style"],
+    "visual_preferences": {
+      "colors": ["Blue", "White", "Orange accents"],
+      "style": "Clean, modern, educational but fun",
+      "text_style": "Bold, easy to read, short phrases"
+    }
+  },
+  "existing_reels": [
+    {
+      "id": "reel_001",
+      "title": "3 SAT Math Shortcuts You NEED to Know",
+      "script": "Did you know most students waste 5 minutes per SAT math problem? Here are 3 shortcuts that'll save you HOURS on test day. Number 1: The back-solving trick. Instead of solving forward, plug in answer choices. Works 80% of the time. Number 2: The estimation hack. Round numbers to make mental math easier, then find the closest answer. Number 3: Skip and return. Hard problem? Mark it and move on. Your brain will work on it subconsciously. Save this for test day!",
+      "engagement": {
+        "views": 15000,
+        "likes": 800,
+        "comments": 45,
+        "shares": 120,
+        "saves": 450
+      },
+      "date": "2025-11-15",
+      "performance_notes": "High save rate indicates valuable content"
+    }
+  ],
+  "scripts": [
+    "Hook: Did you know...",
+    "Hook: Stop making this mistake...",
+    "Hook: The secret to...",
+    "CTA: Save this for later!",
+    "CTA: Share with a friend who needs this!",
+    "CTA: Follow for more SAT tips!"
+  ],
+  "learned_patterns": {
+    "auto_generated": false,
+    "last_updated": null,
+    "best_performing_hooks": [],
+    "avg_script_length": 175,
+    "common_topics": ["math shortcuts", "time management", "test anxiety"],
+    "engagement_insights": {
+      "best_posting_time": null,
+      "avg_engagement_rate": null,
+      "top_performing_format": null
+    }
+  },
+  "content_preferences": {
+    "preferred_topics": [
+      "Math strategies",
+      "Reading comprehension tips",
+      "Time management",
+      "Test day preparation",
+      "College admissions connection"
+    ],
+    "avoid_topics": [
+      "Paid prep courses promotion",
+      "Discouraging statistics",
+      "Overly complex strategies"
+    ]
+  }
+}
