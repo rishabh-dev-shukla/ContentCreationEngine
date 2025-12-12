@@ -97,7 +97,7 @@ Return as JSON with hook, main_content, cta, full_script, word_count, and estima
         try:
             response = self.ai_client.generate(
                 prompt=prompt,
-                system_message="You are an expert Instagram Reels scriptwriter. Always respond with valid JSON.",
+                system_prompt="You are an expert Instagram Reels scriptwriter. Always respond with valid JSON.",
                 temperature=0.7
             )
             
@@ -264,7 +264,7 @@ Return ONLY the rewritten {section} as plain text, not JSON."""
         try:
             response = self.ai_client.generate(
                 prompt=prompt,
-                system_message="You are an expert scriptwriter. Respond with only the rewritten section.",
+                system_prompt="You are an expert scriptwriter. Respond with only the rewritten section.",
                 temperature=0.7
             )
             

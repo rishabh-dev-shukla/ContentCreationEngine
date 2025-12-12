@@ -95,7 +95,7 @@ Return as JSON with b_roll, text_overlays, animations, color_scheme, music_sugge
         try:
             response = self.ai_client.generate(
                 prompt=prompt,
-                system_message="You are a creative director for Instagram Reels. Always respond with valid JSON.",
+                system_prompt="You are a creative director for Instagram Reels. Always respond with valid JSON.",
                 temperature=0.8  # Higher creativity for visuals
             )
             

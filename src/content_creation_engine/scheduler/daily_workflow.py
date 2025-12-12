@@ -45,7 +45,9 @@ class ContentOutput:
         output_dir = output_dir or settings.output_dir
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        filename = f"{self.date}_{self.persona_id}_content.json"
+        # Add timestamp to ensure unique filenames
+        timestamp = datetime.now().strftime("%H%M%S")
+        filename = f"{self.date}_{timestamp}_{self.persona_id}_content.json"
         file_path = output_dir / filename
         
         with open(file_path, "w", encoding="utf-8") as f:
@@ -68,15 +70,21 @@ class ContentPipeline:
         from ..persona import PersonaManager
         from ..utils.ai_client import AIClient
         
-        # Initialize AI client (shared across generators)
-        self.ai_client = AIClient()
+        # Initialize AI client (shared across generators) with settings
+        provider = settings.ai.default_provider
+        api_key = getattr(settings.ai, f"{provider}_api_key", None)
+        model = getattr(settings.ai, f"{provider}_model", None)
+        self.ai_client = AIClient(provider=provider, api_key=api_key, model=model)
         
-        # Initialize scrapers
-        self.instagram_scraper = InstagramScraper()
-        self.news_scraper = NewsScraper()
+        # Initialize scrapers with API keys from settings
+        self.instagram_scraper = InstagramScraper(
+            access_token=settings.instagram.access_token,
+            business_account_id=settings.instagram.business_account_id
+        )
+        self.news_scraper = NewsScraper(api_key=settings.news.api_key)
         self.reddit_scraper = RedditScraper()
-        self.youtube_scraper = YouTubeScraper()
-        self.serper_scraper = SerperScraper()
+        self.youtube_scraper = YouTubeScraper(api_key=settings.youtube.api_key)
+        self.serper_scraper = SerperScraper(api_key=settings.serper.api_key)
         
         # Initialize generators with shared AI client
         self.idea_generator = IdeaGenerator(ai_client=self.ai_client)
@@ -210,65 +218,83 @@ class ContentPipeline:
         # Determine subreddits based on niche
         subreddits = self._get_subreddits_for_niche(niche)
         
-        # Scrape Reddit
-        logger.info("Scraping Reddit...")
-        try:
-            for subreddit in subreddits[:3]:  # Limit to 3 subreddits
-                posts = self.reddit_scraper.scrape(subreddit=subreddit, limit=10)
-                research_data["reddit"].extend(posts)
-        except Exception as e:
-            logger.error(f"Reddit scraping failed: {e}")
+        # Scrape Reddit (skip if not configured)
+        if settings.reddit.client_id and settings.reddit.client_secret:
+            logger.info("Scraping Reddit...")
+            try:
+                for subreddit in subreddits[:3]:  # Limit to 3 subreddits
+                    posts = self.reddit_scraper.scrape(subreddit=subreddit, limit=10)
+                    research_data["reddit"].extend(posts)
+            except Exception as e:
+                logger.error(f"Reddit scraping failed: {e}")
+        else:
+            logger.info("Skipping Reddit (not configured)")
         
-        # Scrape News
-        logger.info("Scraping News...")
-        try:
-            news_query = self._build_news_query(niche)
-            articles = self.news_scraper.scrape(query=news_query, limit=10)
-            research_data["news"] = articles
-        except Exception as e:
-            logger.error(f"News scraping failed: {e}")
+        # Scrape News (skip if not configured)
+        if settings.news.api_key:
+            logger.info("Scraping News...")
+            try:
+                news_query = self._build_news_query(niche)
+                articles = self.news_scraper.scrape(query=news_query, page_size=10)
+                research_data["news"] = articles
+            except Exception as e:
+                logger.error(f"News scraping failed: {e}")
+        else:
+            logger.info("Skipping News API (not configured)")
         
-        # Scrape Instagram (hashtags)
-        logger.info("Scraping Instagram hashtags...")
-        try:
-            for hashtag in hashtags[:5]:  # Limit to 5 hashtags
-                clean_hashtag = hashtag.replace("#", "")
-                posts = self.instagram_scraper.scrape(hashtag=clean_hashtag, limit=10)
-                research_data["instagram"].extend(posts)
-        except Exception as e:
-            logger.error(f"Instagram scraping failed: {e}")
+        # Scrape Instagram (skip if not configured)
+        if settings.instagram.access_token and settings.instagram.business_account_id:
+            logger.info("Scraping Instagram hashtags...")
+            try:
+                # Use niche as query, pass hashtags from persona
+                posts = self.instagram_scraper.scrape(
+                    query=niche,
+                    hashtags=[h.replace("#", "") for h in hashtags[:5]],
+                    limit_per_hashtag=10
+                )
+                research_data["instagram"] = posts
+            except Exception as e:
+                logger.error(f"Instagram scraping failed: {e}")
+        else:
+            logger.info("Skipping Instagram (not configured)")
         
-        # Scrape YouTube for trending videos in niche
-        logger.info("Scraping YouTube...")
-        try:
-            videos = self.youtube_scraper.scrape(query=niche, max_results=15)
-            research_data["youtube"] = videos
-            
-            # Also get trending topics if available
-            trending = self.youtube_scraper.get_trending_topics(niche, limit=5)
-            if trending:
-                research_data["youtube_trending_topics"] = trending
-        except Exception as e:
-            logger.error(f"YouTube scraping failed: {e}")
+        # Scrape YouTube for trending videos in niche (skip if not configured)
+        if settings.youtube.api_key:
+            logger.info("Scraping YouTube...")
+            try:
+                videos = self.youtube_scraper.scrape(query=niche, max_results=15)
+                research_data["youtube"] = videos
+                
+                # Also get trending topics if available
+                trending = self.youtube_scraper.get_trending_topics(niche, limit=5)
+                if trending:
+                    research_data["youtube_trending_topics"] = trending
+            except Exception as e:
+                logger.error(f"YouTube scraping failed: {e}")
+        else:
+            logger.info("Skipping YouTube (not configured)")
         
-        # Scrape Serper for Google search trends and news
-        logger.info("Scraping Serper (Google Search)...")
-        try:
-            # Search for trending content
-            serper_results = self.serper_scraper.scrape(query=niche, num_results=10)
-            research_data["serper"] = serper_results
-            
-            # Get trending questions related to niche
-            trending_questions = self.serper_scraper.get_trending_questions(niche, limit=5)
-            if trending_questions:
-                research_data["serper_questions"] = trending_questions
-            
-            # Get related topics
-            related_topics = self.serper_scraper.get_related_topics(niche, limit=5)
-            if related_topics:
-                research_data["serper_related"] = related_topics
-        except Exception as e:
-            logger.error(f"Serper scraping failed: {e}")
+        # Scrape Serper for Google search trends and news (skip if not configured)
+        if settings.serper.api_key:
+            logger.info("Scraping Serper (Google Search)...")
+            try:
+                # Search for trending content
+                serper_results = self.serper_scraper.scrape(query=niche, num_results=10)
+                research_data["serper"] = serper_results
+                
+                # Get trending questions related to niche
+                trending_questions = self.serper_scraper.get_trending_questions(niche, limit=5)
+                if trending_questions:
+                    research_data["serper_questions"] = trending_questions
+                
+                # Get related topics
+                related_topics = self.serper_scraper.get_related_topics(niche, limit=5)
+                if related_topics:
+                    research_data["serper_related"] = related_topics
+            except Exception as e:
+                logger.error(f"Serper scraping failed: {e}")
+        else:
+            logger.info("Skipping Serper (not configured)")
         
         # Cache the research data
         settings.research_cache_dir.mkdir(parents=True, exist_ok=True)
