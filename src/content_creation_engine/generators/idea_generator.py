@@ -57,9 +57,30 @@ class IdeaGenerator:
         
         cutoff_date = datetime.now() - timedelta(days=days_back)
         
+        # Check persona-specific folder first (new structure)
+        persona_output_dir = output_dir / persona_id
+        if persona_output_dir.exists():
+            for file_path in persona_output_dir.glob("*_content.json"):
+                try:
+                    # Extract date from filename (format: YYYY-MM-DD_HHMMSS_content.json)
+                    date_str = file_path.stem.split("_")[0]
+                    file_date = datetime.strptime(date_str, "%Y-%m-%d")
+                    
+                    if file_date >= cutoff_date:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                            ideas = data.get("content_ideas", [])
+                            for idea in ideas:
+                                title = idea.get("title", "")
+                                if title:
+                                    previous_titles.append(title)
+                except (ValueError, json.JSONDecodeError, KeyError) as e:
+                    logger.debug(f"Could not parse {file_path}: {e}")
+                    continue
+        
+        # Also check old structure for backwards compatibility
         for file_path in output_dir.glob(f"*_{persona_id}_content.json"):
             try:
-                # Extract date from filename (format: YYYY-MM-DD_HHMMSS_persona_content.json)
                 date_str = file_path.stem.split("_")[0]
                 file_date = datetime.strptime(date_str, "%Y-%m-%d")
                 

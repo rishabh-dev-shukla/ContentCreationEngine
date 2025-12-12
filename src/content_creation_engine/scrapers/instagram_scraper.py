@@ -1,12 +1,14 @@
 """
 Instagram scraper using Instagram Graph API.
 Fetches hashtag insights and trending content for research.
+Includes caching to handle rate limits gracefully.
 """
 
 from typing import Any, Dict, List, Optional
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
+import json
 
 try:
     import requests
@@ -15,6 +17,7 @@ except ImportError:
     REQUESTS_AVAILABLE = False
 
 from .base_scraper import BaseScraper
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +57,79 @@ class InstagramScraper(BaseScraper):
         self.business_account_id = business_account_id
         self.api_version = api_version
         self.base_url = f"https://graph.facebook.com/{api_version}"
+        
+        # Cache settings
+        self.cache_max_age_days = 7  # Cache valid for 7 days
+    
+    def _get_cache_dir(self, persona_id: str) -> Path:
+        """Get the cache directory for a persona."""
+        cache_dir = settings.data_dir / "research_cache" / persona_id
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir
+    
+    def _get_cache_file(self, persona_id: str) -> Path:
+        """Get the cache file path for Instagram data."""
+        return self._get_cache_dir(persona_id) / "instagram_cache.json"
+    
+    def _load_cached_data(self, persona_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Load cached Instagram data for a persona.
+        
+        Args:
+            persona_id: The persona identifier
+            
+        Returns:
+            Cached data dict with 'data' and 'timestamp' keys, or None
+        """
+        cache_file = self._get_cache_file(persona_id)
+        
+        if not cache_file.exists():
+            return None
+        
+        try:
+            with open(cache_file, "r", encoding="utf-8") as f:
+                cached = json.load(f)
+            
+            # Check if cache is still valid
+            cached_time = datetime.fromisoformat(cached.get("timestamp", "2000-01-01"))
+            age = datetime.now() - cached_time
+            
+            if age > timedelta(days=self.cache_max_age_days):
+                logger.info(f"Instagram cache expired ({age.days} days old)")
+                return None
+            
+            logger.info(f"Found Instagram cache from {cached_time.strftime('%Y-%m-%d %H:%M')} ({age.days} days ago)")
+            return cached
+            
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            logger.warning(f"Could not load Instagram cache: {e}")
+            return None
+    
+    def _save_cache(self, persona_id: str, data: List[Dict[str, Any]], hashtags: List[str]) -> None:
+        """
+        Save Instagram data to cache.
+        
+        Args:
+            persona_id: The persona identifier
+            data: List of scraped posts
+            hashtags: List of hashtags that were searched
+        """
+        cache_file = self._get_cache_file(persona_id)
+        
+        try:
+            cache_data = {
+                "timestamp": datetime.now().isoformat(),
+                "hashtags": hashtags,
+                "data": data
+            }
+            
+            with open(cache_file, "w", encoding="utf-8") as f:
+                json.dump(cache_data, f, indent=2)
+            
+            logger.info(f"Cached {len(data)} Instagram posts for persona '{persona_id}'")
+            
+        except Exception as e:
+            logger.warning(f"Could not save Instagram cache: {e}")
     
     def get_source_name(self) -> str:
         return "instagram"
@@ -85,12 +161,19 @@ class InstagramScraper(BaseScraper):
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            logger.error(f"Instagram API error: {e}")
+            error_msg = str(e)
+            # Check for rate limit or specific errors
+            if "400" in error_msg:
+                logger.warning(f"Instagram API rate limit or invalid request: {e}")
+            else:
+                logger.error(f"Instagram API error: {e}")
             return None
     
     def search_hashtag(self, hashtag: str) -> Optional[str]:
         """
         Search for a hashtag and get its ID.
+        
+        Note: Instagram limits hashtag searches to 30 per 7-day rolling period.
         
         Args:
             hashtag: Hashtag to search (without #)
@@ -101,11 +184,14 @@ class InstagramScraper(BaseScraper):
         if not self.access_token or not self.business_account_id:
             return None
         
+        # Normalize hashtag (lowercase, no special chars)
+        clean_hashtag = hashtag.lower().replace(" ", "").replace("-", "")
+        
         result = self._make_api_request(
             "ig_hashtag_search",
             {
                 "user_id": self.business_account_id,
-                "q": hashtag
+                "q": clean_hashtag
             }
         )
         
@@ -145,15 +231,18 @@ class InstagramScraper(BaseScraper):
         self,
         query: str,
         hashtags: Optional[List[str]] = None,
-        limit_per_hashtag: int = 10
+        limit_per_hashtag: int = 10,
+        persona_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Scrape Instagram for content related to the query.
+        Falls back to cached data if API fails (rate limiting, etc.)
         
         Args:
             query: Niche or topic to search for
             hashtags: Specific hashtags to search (auto-detected if None)
             limit_per_hashtag: Maximum posts per hashtag
+            persona_id: Persona identifier for caching (enables cache fallback)
             
         Returns:
             List of post data dictionaries
@@ -168,6 +257,7 @@ class InstagramScraper(BaseScraper):
         
         target_hashtags = hashtags or self._get_hashtags_for_niche(query)
         results = []
+        api_errors = 0
         
         for hashtag in target_hashtags:
             try:
@@ -175,6 +265,7 @@ class InstagramScraper(BaseScraper):
                 hashtag_id = self.search_hashtag(hashtag)
                 if not hashtag_id:
                     logger.warning(f"Could not find hashtag: {hashtag}")
+                    api_errors += 1
                     continue
                 
                 # Get top media for hashtag
@@ -198,7 +289,19 @@ class InstagramScraper(BaseScraper):
                 
             except Exception as e:
                 logger.error(f"Error scraping #{hashtag}: {e}")
+                api_errors += 1
                 continue
+        
+        # If we got results, save to cache
+        if results and persona_id:
+            self._save_cache(persona_id, results, target_hashtags)
+        
+        # If API failed completely, try to use cached data
+        if not results and api_errors > 0 and persona_id:
+            cached = self._load_cached_data(persona_id)
+            if cached and cached.get("data"):
+                logger.info(f"Using cached Instagram data ({len(cached['data'])} posts from previous run)")
+                return cached["data"]
         
         # Sort by engagement
         results.sort(key=lambda x: x.get("likes", 0) + x.get("comments", 0), reverse=True)

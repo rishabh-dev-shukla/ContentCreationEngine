@@ -41,14 +41,17 @@ class ContentOutput:
         }
     
     def save(self, output_dir: Optional[Path] = None) -> Path:
-        """Save output to JSON file."""
-        output_dir = output_dir or settings.output_dir
-        output_dir.mkdir(parents=True, exist_ok=True)
+        """Save output to JSON file organized by persona."""
+        base_output_dir = output_dir or settings.output_dir
+        
+        # Create persona-specific subdirectory
+        persona_output_dir = base_output_dir / self.persona_id
+        persona_output_dir.mkdir(parents=True, exist_ok=True)
         
         # Add timestamp to ensure unique filenames
         timestamp = datetime.now().strftime("%H%M%S")
-        filename = f"{self.date}_{timestamp}_{self.persona_id}_content.json"
-        file_path = output_dir / filename
+        filename = f"{self.date}_{timestamp}_content.json"
+        file_path = persona_output_dir / filename
         
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
@@ -243,14 +246,20 @@ class ContentPipeline:
             logger.info("Skipping News API (not configured)")
         
         # Scrape Instagram (skip if not configured)
+        # Note: Instagram limits hashtag searches to 30 per 7-day period
+        # Cache is used to store and reuse data when API rate limits hit
+        persona_id = persona.get("persona_id", "unknown")
         if settings.instagram.access_token and settings.instagram.business_account_id:
-            logger.info("Scraping Instagram hashtags...")
+            logger.info("Scraping Instagram hashtags (limited to 3 to preserve API quota)...")
             try:
-                # Use niche as query, pass hashtags from persona
+                # Use niche as query, limit to 3 hashtags to preserve rate limit
+                # Instagram allows only 30 hashtag searches per 7 days
+                # Pass persona_id to enable cache fallback on API errors
                 posts = self.instagram_scraper.scrape(
                     query=niche,
-                    hashtags=[h.replace("#", "") for h in hashtags[:5]],
-                    limit_per_hashtag=10
+                    hashtags=[h.replace("#", "") for h in hashtags[:3]],
+                    limit_per_hashtag=15,
+                    persona_id=persona_id
                 )
                 research_data["instagram"] = posts
             except Exception as e:
