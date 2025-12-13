@@ -6,16 +6,36 @@
     "target_audience": "High school students (16-18) preparing for SAT",
     "tone": "Friendly, encouraging, slightly humorous, relatable",
     "unique_angle": "Quick tips, shortcuts, and hacks that actually work",
-    "hashtags": ["#SATprep", "#StudyTips", "#SATtips", "#DigitalSAT", "#satTestPrep", "#CollegeBound", "#SatHacks", "#SATScores"],
+    "hashtags_short": [
+      "#SATprep",
+      "#SATtips",
+      "#SatHacks",
+      "#SATScores"
+    ],
+    "hashtags": [
+      "#SATprep",
+      "#SATtips",
+      "#DigitalSAT #SatHacks",
+      "#SATScores"
+    ],
     "posting_frequency": "daily"
   },
   "style_guide": {
     "hook_style": "Question, shocking statistic, or bold statement",
     "content_style": "Numbered tips, fast-paced, visual demonstrations",
     "cta_style": "Save and share focused, creates urgency",
-    "avoid": ["Complex jargon", "Negative messaging", "Overwhelming information", "Boring lecture style"],
+    "avoid": [
+      "Complex jargon",
+      "Negative messaging",
+      "Overwhelming information",
+      "Boring lecture style"
+    ],
     "visual_preferences": {
-      "colors": ["Blue", "White", "Orange accents"],
+      "colors": [
+        "Blue",
+        "White",
+        "Orange accents"
+      ],
       "style": "Clean, modern, educational but fun",
       "text_style": "Bold, easy to read, short phrases"
     }
@@ -49,7 +69,11 @@
     "last_updated": null,
     "best_performing_hooks": [],
     "avg_script_length": 175,
-    "common_topics": ["math shortcuts", "time management", "test anxiety"],
+    "common_topics": [
+      "math shortcuts",
+      "time management",
+      "test anxiety"
+    ],
     "engagement_insights": {
       "best_posting_time": null,
       "avg_engagement_rate": null,

@@ -145,6 +145,10 @@ Return a JSON array with content ideas including title, concept, and engagement 
         previous_titles = self._get_previous_ideas(persona_id, days_back=30)
         existing_reel_titles = self._get_existing_reel_titles(persona)
         all_previous = list(set(previous_titles + existing_reel_titles))
+        # For strict duplicate check, normalize all previous titles
+        def norm_title(t):
+            return t.strip().lower()
+        all_previous_norm = set(norm_title(t) for t in all_previous if t)
         
         # Format research data for prompt
         reddit_data = self._format_research_data(research_data.get("reddit", []))
@@ -193,12 +197,19 @@ Return a JSON array with content ideas including title, concept, and engagement 
                 temperature=0.9,  # Higher temperature for more creativity and variety
                 max_tokens=max_tokens
             )
-            
             # Parse the response
             ideas = self._parse_ideas_response(response)
-            logger.info(f"Generated {len(ideas)} content ideas (avoided {len(all_previous)} previous ideas)")
-            return ideas
-            
+            # Filter out duplicates by normalized title
+            unique_ideas = []
+            seen_titles = set(all_previous_norm)
+            for idea in ideas:
+                title = idea.get("title", "")
+                norm = norm_title(title)
+                if title and norm not in seen_titles:
+                    unique_ideas.append(idea)
+                    seen_titles.add(norm)
+            logger.info(f"Generated {len(unique_ideas)} unique content ideas (avoided {len(all_previous)} previous ideas)")
+            return unique_ideas
         except Exception as e:
             logger.error(f"Error generating ideas: {e}")
             return []

@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Research Data - ContentCreationEngine{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>
+            <i class="bi bi-search text-primary me-2"></i>
+            Research Data
+        </h1>
+        <p class="text-muted">View all research data collected from various APIs</p>
+    </div>
+</div>
+
+{% if research_data %}
+<!-- Toggle View -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="btn-group" role="group">
+            <input type="radio" class="btn-check" name="viewToggle" id="tableView" checked>
+            <label class="btn btn-outline-primary" for="tableView">
+                <i class="bi bi-table me-1"></i> Table View
+            </label>
+            <input type="radio" class="btn-check" name="viewToggle" id="tileView">
+            <label class="btn btn-outline-primary" for="tileView">
+                <i class="bi bi-grid me-1"></i> Tile View
+            </label>
+        </div>
+    </div>
+</div>
+
+<!-- Research Data by Date -->
+{% for entry in research_data %}
+{% set entry_id = loop.index %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-calendar me-2"></i>
+            {{ entry.date }}
+            <small class="text-muted ms-2">{{ entry.filename }}</small>
+        </h5>
+    </div>
+    <div class="card-body">
+        <!-- Source Tabs -->
+        {% set ns = namespace(first_source=none) %}
+        {% set sources = ['reddit', 'news', 'instagram', 'youtube', 'serper'] %}
+        {% for source in sources %}
+            {% if entry.data.get(source) and entry.data[source]|length > 0 and ns.first_source is none %}
+                {% set ns.first_source = source %}
+            {% endif %}
+        {% endfor %}
+        
+        <ul class="nav nav-pills mb-3" id="researchTabs{{ entry_id }}" role="tablist">
+            {% for source in sources %}
+            {% if entry.data.get(source) and entry.data[source]|length > 0 %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if source == ns.first_source %}active{% endif %}" 
+                        id="tab{{ entry_id }}_{{ source }}"
+                        data-bs-toggle="pill" 
+                        data-bs-target="#pane{{ entry_id }}_{{ source }}"
+                        type="button"
+                        role="tab"
+                        aria-controls="pane{{ entry_id }}_{{ source }}"
+                        aria-selected="{% if source == ns.first_source %}true{% else %}false{% endif %}">
+                    {% if source == 'reddit' %}
+                    <i class="bi bi-reddit text-warning"></i>
+                    {% elif source == 'news' %}
+                    <i class="bi bi-newspaper text-info"></i>
+                    {% elif source == 'instagram' %}
+                    <i class="bi bi-instagram text-danger"></i>
+                    {% elif source == 'youtube' %}
+                    <i class="bi bi-youtube text-danger"></i>
+                    {% elif source == 'serper' %}
+                    <i class="bi bi-google text-primary"></i>
+                    {% endif %}
+                    {{ source|capitalize }} ({{ entry.data[source]|length }})
+                </button>
+            </li>
+            {% endif %}
+            {% endfor %}
+        </ul>
+        
+        <div class="tab-content" id="researchTabContent{{ entry_id }}">
+            {% for source in sources %}
+            {% if entry.data.get(source) and entry.data[source]|length > 0 %}
+            <div class="tab-pane fade {% if source == ns.first_source %}show active{% endif %}" 
+                 id="pane{{ entry_id }}_{{ source }}" 
+                 role="tabpanel"
+                 aria-labelledby="tab{{ entry_id }}_{{ source }}">
+                
+                <!-- Table View -->
+                <div class="view-table">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Title</th>
+                                    <th>Source</th>
+                                    {% if source in ['youtube', 'instagram'] %}
+                                    <th><i class="bi bi-eye-fill text-info"></i> Views</th>
+                                    <th><i class="bi bi-heart-fill text-danger"></i> Likes</th>
+                                    <th><i class="bi bi-chat-fill text-primary"></i> Comments</th>
+                                    {% endif %}
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in entry.data[source] %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>
+                                        <strong>{{ item.title if item.title else item.get('headline', 'Untitled') }}</strong>
+                                        {% if item.summary %}
+                                        <br><small class="text-muted">{{ item.summary[:100] }}...</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.source %}
+                                        <span class="badge bg-secondary">{{ item.source }}</span>
+                                        {% elif item.subreddit %}
+                                        <span class="badge bg-warning">r/{{ item.subreddit }}</span>
+                                        {% elif item.channel %}
+                                        <span class="badge bg-danger">{{ item.channel }}</span>
+                                        {% else %}
+                                        <span class="badge bg-light text-dark">{{ source }}</span>
+                                        {% endif %}
+                                    </td>
+                                    {% if source in ['youtube', 'instagram'] %}
+                                    <td>
+                                        {% if item.views is defined and item.views is not none %}
+                                        <span class="text-info fw-bold">{{ "{:,}".format(item.views) }}</span>
+                                        {% else %}-{% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.likes is defined and item.likes is not none %}
+                                        <span class="text-danger fw-bold">{{ "{:,}".format(item.likes) }}</span>
+                                        {% else %}-{% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.comments is defined and item.comments is not none %}
+                                        <span class="text-primary fw-bold">{{ "{:,}".format(item.comments) }}</span>
+                                        {% else %}-{% endif %}
+                                    </td>
+                                    {% endif %}
+                                    <td>
+                                        {% if item.published_at %}
+                                        {{ item.published_at[:10] }}
+                                        {% elif item.created_at %}
+                                        {{ item.created_at[:10] if item.created_at is string else '' }}
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.url %}
+                                        <a href="{{ item.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-box-arrow-up-right"></i>
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Tile View -->
+                <div class="view-tiles d-none">
+                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+                        {% for item in entry.data[source] %}
+                        <div class="col">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ item.title if item.title else item.get('headline', 'Untitled') }}</h6>
+                                    {% if item.summary %}
+                                    <p class="card-text small text-muted">{{ item.summary[:150] }}...</p>
+                                    {% endif %}
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        {% if item.source %}
+                                        <span class="badge bg-secondary">{{ item.source }}</span>
+                                        {% elif item.subreddit %}
+                                        <span class="badge bg-warning">r/{{ item.subreddit }}</span>
+                                        {% endif %}
+                                        {% if item.url %}
+                                        <a href="{{ item.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-box-arrow-up-right"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% if source in ['youtube', 'instagram'] and (item.views is defined or item.likes is defined or item.comments is defined) %}
+                                <div class="card-footer small">
+                                    <div class="d-flex justify-content-between">
+                                        {% if item.views is defined and item.views is not none %}
+                                        <span class="text-info"><i class="bi bi-eye-fill me-1"></i>{{ "{:,}".format(item.views) }}</span>
+                                        {% endif %}
+                                        {% if item.likes is defined and item.likes is not none %}
+                                        <span class="text-danger"><i class="bi bi-heart-fill me-1"></i>{{ "{:,}".format(item.likes) }}</span>
+                                        {% endif %}
+                                        {% if item.comments is defined and item.comments is not none %}
+                                        <span class="text-primary"><i class="bi bi-chat-fill me-1"></i>{{ "{:,}".format(item.comments) }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% elif item.engagement %}
+                                <div class="card-footer small text-muted">
+                                    {% if item.engagement is string %}
+                                    {{ item.engagement }}
+                                    {% else %}
+                                    {% if item.engagement.likes %}<i class="bi bi-heart-fill text-danger me-1"></i>{{ item.engagement.likes }}{% endif %}
+                                    {% if item.engagement.comments %}<i class="bi bi-chat-fill text-primary ms-2 me-1"></i>{{ item.engagement.comments }}{% endif %}
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-search fs-1 text-muted"></i>
+    <h3 class="mt-3">No Research Data Found</h3>
+    <p class="text-muted">Research data will appear here after you run content generation.</p>
+    <a href="{{ url_for('generate_page') }}" class="btn btn-primary">
+        <i class="bi bi-magic me-1"></i> Generate Content
+    </a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Toggle between table and tile views
+document.getElementById('tableView').addEventListener('change', function() {
+    document.querySelectorAll('.view-table').forEach(el => el.classList.remove('d-none'));
+    document.querySelectorAll('.view-tiles').forEach(el => el.classList.add('d-none'));
+});
+
+document.getElementById('tileView').addEventListener('change', function() {
+    document.querySelectorAll('.view-table').forEach(el => el.classList.add('d-none'));
+    document.querySelectorAll('.view-tiles').forEach(el => el.classList.remove('d-none'));
+});
+</script>
+{% endblock %}

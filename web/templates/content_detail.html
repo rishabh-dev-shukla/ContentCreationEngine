@@ -1,0 +1,579 @@
+{% extends "base.html" %}
+
+{% block title %}Content Details - ContentCreationEngine{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('content_page') }}">Content</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('content_page') }}?persona={{ persona_id }}">{{ persona_id }}</a></li>
+                <li class="breadcrumb-item active">{{ content.date }}</li>
+            </ol>
+        </nav>
+        <h1>
+            <i class="bi bi-file-earmark-text text-primary me-2"></i>
+            Content Details
+        </h1>
+        <p class="text-muted">
+            <span class="badge bg-primary me-2">{{ content.persona_id }}</span>
+            {{ content.date }} | {{ content.niche }}
+        </p>
+    </div>
+</div>
+
+<!-- Summary Stats -->
+<div class="row mb-4">
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card text-center bg-primary text-white">
+            <div class="card-body">
+                <h2 class="mb-0">{{ content.content_ideas|length if content.content_ideas else 0 }}</h2>
+                <small>Ideas</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <h2 class="mb-0">{{ content.scripts|length if content.scripts else 0 }}</h2>
+                <small>Scripts</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card text-center bg-info text-white">
+            <div class="card-body">
+                <h2 class="mb-0">{{ content.visuals|length if content.visuals else 0 }}</h2>
+                <small>Visuals</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card text-center bg-secondary text-white">
+            <div class="card-body">
+                <h2 class="mb-0">{{ content.metadata.duration_seconds|round(1) if content.metadata and content.metadata.duration_seconds else '?' }}</h2>
+                <small>Seconds</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" id="contentTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="ideas-tab" data-bs-toggle="tab" data-bs-target="#ideas" type="button">
+            <i class="bi bi-lightbulb me-1"></i> Ideas ({{ content.content_ideas|length if content.content_ideas else 0 }})
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="scripts-tab" data-bs-toggle="tab" data-bs-target="#scripts" type="button">
+            <i class="bi bi-file-text me-1"></i> Scripts ({{ content.scripts|length if content.scripts else 0 }})
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="visuals-tab" data-bs-toggle="tab" data-bs-target="#visuals" type="button">
+            <i class="bi bi-palette me-1"></i> Visuals ({{ content.visuals|length if content.visuals else 0 }})
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="research-tab" data-bs-toggle="tab" data-bs-target="#research" type="button">
+            <i class="bi bi-search me-1"></i> Research Data
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="contentTabsContent">
+    <!-- Ideas Tab -->
+    <div class="tab-pane fade show active" id="ideas" role="tabpanel">
+        {% if content.content_ideas %}
+        <div class="row">
+            {% for idea in content.content_ideas %}
+            <div class="col-12 mb-3">
+                <div class="card idea-card" data-index="{{ loop.index0 }}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <span class="badge bg-secondary me-2">#{{ loop.index }}</span>
+                            {{ idea.title if idea.title else 'Untitled Idea' }}
+                        </h5>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-success" onclick="updateIdeaStatus({{ loop.index0 }}, 'approved')" title="Approve">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="updateIdeaStatus({{ loop.index0 }}, 'rejected')" title="Reject">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editIdea({{ loop.index0 }})" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if idea.hook %}
+                        <p><strong>Hook:</strong> {{ idea.hook }}</p>
+                        {% endif %}
+                        {% if idea.description %}
+                        <p>{{ idea.description }}</p>
+                        {% endif %}
+                        {% if idea.content_structure %}
+                        <p><strong>Structure:</strong> {{ idea.content_structure }}</p>
+                        {% endif %}
+                        {% if idea.hashtags %}
+                        <div class="mt-2">
+                            {% for tag in idea.hashtags %}
+                            <span class="badge bg-light text-dark me-1">{{ tag }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
+                        {% if idea.status %}
+                        <div class="mt-2">
+                            <span class="badge bg-{{ 'success' if idea.status == 'approved' else 'danger' if idea.status == 'rejected' else 'secondary' }}">
+                                {{ idea.status|capitalize }}
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-lightbulb fs-1"></i>
+            <p class="mt-2">No ideas in this content run</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Scripts Tab -->
+    <div class="tab-pane fade" id="scripts" role="tabpanel">
+        {% if content.scripts %}
+        <div class="accordion" id="scriptsAccordion">
+            {% for script in content.scripts %}
+            <div class="accordion-item" data-script-index="{{ loop.index0 }}">
+                <h2 class="accordion-header">
+                    <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" 
+                            data-bs-toggle="collapse" data-bs-target="#script{{ loop.index }}">
+                        <span class="badge bg-success me-2">#{{ loop.index }}</span>
+                        {{ script.title if script.title else script.idea_title if script.idea_title else 'Script ' ~ loop.index }}
+                        {% if script.status %}
+                        <span class="badge ms-2 bg-{{ 'success' if script.status == 'approved' else 'danger' if script.status == 'rejected' else 'secondary' }}">
+                            <i class="bi bi-{{ 'check-circle' if script.status == 'approved' else 'x-circle' if script.status == 'rejected' else 'clock' }} me-1"></i>
+                            {{ script.status|capitalize }}
+                        </span>
+                        {% endif %}
+                    </button>
+                </h2>
+                <div id="script{{ loop.index }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+                     data-bs-parent="#scriptsAccordion">
+                    <div class="accordion-body">
+                        <div class="d-flex justify-content-end mb-3">
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-success" onclick="updateScriptStatus({{ loop.index0 }}, 'approved')">
+                                    <i class="bi bi-check-lg me-1"></i> Approve
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="updateScriptStatus({{ loop.index0 }}, 'rejected')">
+                                    <i class="bi bi-x-lg me-1"></i> Reject
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary" onclick="editScript({{ loop.index0 }})">
+                                    <i class="bi bi-pencil me-1"></i> Edit
+                                </button>
+                            </div>
+                        </div>
+                        
+                        {% if script.hook %}
+                        <div class="alert alert-info">
+                            <strong><i class="bi bi-megaphone me-1"></i> Hook:</strong> {{ script.hook }}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="bg-light p-3 rounded">
+                            <pre class="mb-0" style="white-space: pre-wrap;">{{ script.full_script if script.full_script else script.main_content if script.main_content else script.script if script.script else script.content if script.content else 'No script content' }}</pre>
+                        </div>
+                        
+                        {% if script.cta %}
+                        <div class="alert alert-success mt-3">
+                            <strong><i class="bi bi-hand-index me-1"></i> CTA:</strong> {{ script.cta }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if script.speaker_notes %}
+                        <div class="alert alert-warning mt-3">
+                            <strong><i class="bi bi-mic me-1"></i> Speaker Notes:</strong> {{ script.speaker_notes }}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mt-3 d-flex gap-3">
+                            {% if script.word_count %}
+                            <small class="text-muted"><i class="bi bi-file-word me-1"></i>{{ script.word_count }} words</small>
+                            {% endif %}
+                            {% if script.estimated_duration_seconds %}
+                            <small class="text-muted"><i class="bi bi-clock me-1"></i>~{{ script.estimated_duration_seconds }}s</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-file-text fs-1"></i>
+            <p class="mt-2">No scripts in this content run</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Visuals Tab -->
+    <div class="tab-pane fade" id="visuals" role="tabpanel">
+        {% if content.visuals %}
+        <div class="row">
+            {% for visual in content.visuals %}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-palette me-1"></i> Visual Suggestion #{{ loop.index }}
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% if visual.style %}
+                        <p><strong>Style:</strong> {{ visual.style }}</p>
+                        {% endif %}
+                        {% if visual.color_scheme %}
+                        <p><strong>Colors:</strong> {{ visual.color_scheme }}</p>
+                        {% endif %}
+                        {% if visual.text_overlays %}
+                        <p><strong>Text Overlays:</strong></p>
+                        <ul>
+                            {% for overlay in visual.text_overlays %}
+                            <li>{{ overlay }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                        {% if visual.suggestions %}
+                        <p><strong>Suggestions:</strong> {{ visual.suggestions }}</p>
+                        {% endif %}
+                        {% if visual.scenes %}
+                        <p><strong>Scenes:</strong></p>
+                        <ol>
+                            {% for scene in visual.scenes %}
+                            <li>{{ scene }}</li>
+                            {% endfor %}
+                        </ol>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-palette fs-1"></i>
+            <p class="mt-2">No visual suggestions in this content run</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Research Data Tab -->
+    <div class="tab-pane fade" id="research" role="tabpanel">
+        {% if content.research_data %}
+        <div class="row">
+            {% for source, items in content.research_data.items() %}
+            {% if items and items is iterable and items is not string %}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            {% if source == 'reddit' %}
+                            <i class="bi bi-reddit text-warning me-1"></i>
+                            {% elif source == 'news' %}
+                            <i class="bi bi-newspaper text-info me-1"></i>
+                            {% elif source == 'instagram' %}
+                            <i class="bi bi-instagram text-danger me-1"></i>
+                            {% elif source == 'youtube' %}
+                            <i class="bi bi-youtube text-danger me-1"></i>
+                            {% elif source == 'serper' %}
+                            <i class="bi bi-google text-primary me-1"></i>
+                            {% else %}
+                            <i class="bi bi-database me-1"></i>
+                            {% endif %}
+                            {{ source|replace('_', ' ')|title }} ({{ items|length }})
+                        </h6>
+                    </div>
+                    <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                        {% for item in items[:10] %}
+                        <div class="border-bottom pb-2 mb-2">
+                            <strong>{{ item.title if item.title else item.get('headline', 'Untitled') }}</strong>
+                            {% if item.url %}
+                            <a href="{{ item.url }}" target="_blank" class="ms-2">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                            {% endif %}
+                            {% if item.summary %}
+                            <p class="text-muted small mb-0">{{ item.summary[:150] }}...</p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        {% if items|length > 10 %}
+                        <p class="text-muted text-center">+{{ items|length - 10 }} more items</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-search fs-1"></i>
+            <p class="mt-2">No research data available</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editModalTitle">Edit Content</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    <input type="hidden" id="editType">
+                    <input type="hidden" id="editIndex">
+                    
+                    <div class="mb-3">
+                        <label for="editTitle" class="form-label">Title</label>
+                        <input type="text" class="form-control" id="editTitle">
+                    </div>
+                    
+                    <!-- Idea-specific fields -->
+                    <div class="mb-3 idea-field">
+                        <label for="editDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="editDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3 idea-field">
+                        <label for="editHookIdea" class="form-label">Hook</label>
+                        <input type="text" class="form-control" id="editHookIdea">
+                    </div>
+                    
+                    <!-- Script-specific fields -->
+                    <div class="mb-3 script-field">
+                        <label for="editHook" class="form-label">Hook</label>
+                        <textarea class="form-control" id="editHook" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="mb-3 script-field">
+                        <label for="editContent" class="form-label">Main Script Content</label>
+                        <textarea class="form-control" id="editContent" rows="10"></textarea>
+                    </div>
+                    
+                    <div class="mb-3 script-field">
+                        <label for="editCta" class="form-label">Call to Action (CTA)</label>
+                        <textarea class="form-control" id="editCta" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="mb-3 script-field">
+                        <label for="editSpeakerNotes" class="form-label">Speaker Notes</label>
+                        <textarea class="form-control" id="editSpeakerNotes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden data store for scripts/ideas -->
+<script type="application/json" id="contentData">
+{
+    "ideas": {{ content.content_ideas|tojson if content.content_ideas else '[]' }},
+    "scripts": {{ content.scripts|tojson if content.scripts else '[]' }}
+}
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const personaId = '{{ persona_id }}';
+const filename = '{{ filename }}';
+const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+const contentData = JSON.parse(document.getElementById('contentData').textContent);
+
+function showFieldsForType(type) {
+    // Hide all type-specific fields first
+    document.querySelectorAll('.idea-field').forEach(el => el.classList.add('d-none'));
+    document.querySelectorAll('.script-field').forEach(el => el.classList.add('d-none'));
+    
+    // Show fields for the selected type
+    if (type === 'idea') {
+        document.querySelectorAll('.idea-field').forEach(el => el.classList.remove('d-none'));
+    } else {
+        document.querySelectorAll('.script-field').forEach(el => el.classList.remove('d-none'));
+    }
+}
+
+async function updateIdeaStatus(index, status) {
+    const statusText = status === 'approved' ? 'approve' : 'reject';
+    if (!confirm(`Are you sure you want to ${statusText} this idea?`)) return;
+    
+    try {
+        const response = await fetch(`/api/content/${personaId}/${filename}/idea/${index}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+        
+        if (response.ok) {
+            showToast(`Idea ${status}!`, 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            const data = await response.json();
+            showToast('Error: ' + data.error, 'danger');
+        }
+    } catch (err) {
+        showToast('Error updating idea', 'danger');
+    }
+}
+
+async function updateScriptStatus(index, status) {
+    const statusText = status === 'approved' ? 'approve' : 'reject';
+    if (!confirm(`Are you sure you want to ${statusText} this script?`)) return;
+    
+    try {
+        const response = await fetch(`/api/content/${personaId}/${filename}/script/${index}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+        
+        if (response.ok) {
+            showToast(`Script ${status}!`, 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            const data = await response.json();
+            showToast('Error: ' + data.error, 'danger');
+        }
+    } catch (err) {
+        showToast('Error updating script', 'danger');
+    }
+}
+
+function editIdea(index) {
+    document.getElementById('editType').value = 'idea';
+    document.getElementById('editIndex').value = index;
+    document.getElementById('editModalTitle').textContent = 'Edit Idea';
+    showFieldsForType('idea');
+    
+    // Get idea data from the stored JSON
+    const idea = contentData.ideas[index];
+    if (idea) {
+        document.getElementById('editTitle').value = idea.title || '';
+        document.getElementById('editDescription').value = idea.description || '';
+        document.getElementById('editHookIdea').value = idea.hook || '';
+    }
+    
+    editModal.show();
+}
+
+function editScript(index) {
+    document.getElementById('editType').value = 'script';
+    document.getElementById('editIndex').value = index;
+    document.getElementById('editModalTitle').textContent = 'Edit Script';
+    showFieldsForType('script');
+    
+    // Get script data from the stored JSON
+    const script = contentData.scripts[index];
+    if (script) {
+        document.getElementById('editTitle').value = script.title || script.idea_title || '';
+        document.getElementById('editHook').value = script.hook || '';
+        document.getElementById('editContent').value = script.full_script || script.main_content || script.script || script.content || '';
+        document.getElementById('editCta').value = script.cta || '';
+        document.getElementById('editSpeakerNotes').value = script.speaker_notes || '';
+    }
+    
+    editModal.show();
+}
+
+async function saveEdit() {
+    const type = document.getElementById('editType').value;
+    const index = document.getElementById('editIndex').value;
+    const title = document.getElementById('editTitle').value;
+    
+    let endpoint, data;
+    
+    if (type === 'idea') {
+        endpoint = `/api/content/${personaId}/${filename}/idea/${index}`;
+        data = {
+            title: title,
+            description: document.getElementById('editDescription').value,
+            hook: document.getElementById('editHookIdea').value
+        };
+    } else {
+        endpoint = `/api/content/${personaId}/${filename}/script/${index}`;
+        data = {
+            title: title,
+            hook: document.getElementById('editHook').value,
+            full_script: document.getElementById('editContent').value,
+            cta: document.getElementById('editCta').value,
+            speaker_notes: document.getElementById('editSpeakerNotes').value
+        };
+    }
+    
+    try {
+        const response = await fetch(endpoint, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            editModal.hide();
+            showToast('Changes saved!', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            const result = await response.json();
+            showToast('Error: ' + result.error, 'danger');
+        }
+    } catch (err) {
+        showToast('Error saving changes', 'danger');
+    }
+}
+
+function showToast(message, type = 'info') {
+    // Create toast element
+    const toastHtml = `
+        <div class="toast align-items-center text-white bg-${type} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    let toastContainer = document.getElementById('toastContainer');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toastContainer';
+        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        document.body.appendChild(toastContainer);
+    }
+    
+    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+    const toastEl = toastContainer.lastElementChild;
+    const toast = new bootstrap.Toast(toastEl);
+    toast.show();
+    
+    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+}
+</script>
+{% endblock %}

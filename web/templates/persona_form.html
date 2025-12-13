@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if edit_mode else 'Create' }} Persona - ContentCreationEngine{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('personas_page') }}">Personas</a></li>
+                <li class="breadcrumb-item active">{{ 'Edit' if edit_mode else 'Create' }}</li>
+            </ol>
+        </nav>
+        <h1>
+            <i class="bi bi-{{ 'pencil' if edit_mode else 'person-plus' }} text-primary me-2"></i>
+            {{ 'Edit' if edit_mode else 'Create' }} Persona
+        </h1>
+    </div>
+</div>
+
+<form id="personaForm" class="needs-validation" novalidate>
+    <div class="row">
+        <!-- Basic Info -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Basic Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="personaId" class="form-label">Persona ID *</label>
+                        <input type="text" class="form-control" id="personaId" name="persona_id" 
+                               value="{{ persona.persona_id if persona else '' }}"
+                               pattern="[a-z0-9_]+" required
+                               {% if edit_mode %}readonly{% endif %}>
+                        <div class="form-text">Lowercase letters, numbers, and underscores only</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Display Name *</label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               value="{{ persona.basic_info.name if persona else '' }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="niche" class="form-label">Niche *</label>
+                        <input type="text" class="form-control" id="niche" name="niche" 
+                               value="{{ persona.basic_info.niche if persona else '' }}" required>
+                        <div class="form-text">e.g., "SAT Exam Preparation", "Fitness Tips"</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="targetAudience" class="form-label">Target Audience *</label>
+                        <input type="text" class="form-control" id="targetAudience" name="target_audience" 
+                               value="{{ persona.basic_info.target_audience if persona else '' }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="tone" class="form-label">Tone</label>
+                        <input type="text" class="form-control" id="tone" name="tone" 
+                               value="{{ persona.basic_info.tone if persona else 'Friendly and engaging' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="uniqueAngle" class="form-label">Unique Angle</label>
+                        <input type="text" class="form-control" id="uniqueAngle" name="unique_angle" 
+                               value="{{ persona.basic_info.unique_angle if persona else '' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="postingFrequency" class="form-label">Posting Frequency</label>
+                        <select class="form-select" id="postingFrequency" name="posting_frequency">
+                            <option value="daily" {% if persona and persona.basic_info.posting_frequency == 'daily' %}selected{% endif %}>Daily</option>
+                            <option value="twice_daily" {% if persona and persona.basic_info.posting_frequency == 'twice_daily' %}selected{% endif %}>Twice Daily</option>
+                            <option value="weekly" {% if persona and persona.basic_info.posting_frequency == 'weekly' %}selected{% endif %}>Weekly</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="hashtags" class="form-label">Hashtags</label>
+                        <textarea class="form-control" id="hashtags" name="hashtags" rows="2">{% if persona and persona.basic_info.hashtags %}{{ persona.basic_info.hashtags|join(', ') }}{% endif %}</textarea>
+                        <div class="form-text">Comma-separated, e.g., #SATprep, #StudyTips</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Style Guide -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-palette me-2"></i>Style Guide</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="hookStyle" class="form-label">Hook Style</label>
+                        <input type="text" class="form-control" id="hookStyle" name="hook_style" 
+                               value="{{ persona.style_guide.hook_style if persona else 'Question or bold statement' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="contentStyle" class="form-label">Content Style</label>
+                        <input type="text" class="form-control" id="contentStyle" name="content_style" 
+                               value="{{ persona.style_guide.content_style if persona else 'Fast-paced, value-packed' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="ctaStyle" class="form-label">Call-to-Action Style</label>
+                        <input type="text" class="form-control" id="ctaStyle" name="cta_style" 
+                               value="{{ persona.style_guide.cta_style if persona else 'Save and share focused' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="avoid" class="form-label">Things to Avoid</label>
+                        <textarea class="form-control" id="avoid" name="avoid" rows="2">{% if persona and persona.style_guide.avoid %}{{ persona.style_guide.avoid|join(', ') }}{% endif %}</textarea>
+                        <div class="form-text">Comma-separated list of topics/styles to avoid</div>
+                    </div>
+                    
+                    <hr>
+                    <h6>Visual Preferences</h6>
+                    
+                    <div class="mb-3">
+                        <label for="colors" class="form-label">Brand Colors</label>
+                        <input type="text" class="form-control" id="colors" name="colors" 
+                               value="{% if persona and persona.style_guide.visual_preferences %}{{ persona.style_guide.visual_preferences.colors|join(', ') }}{% endif %}">
+                        <div class="form-text">Comma-separated, e.g., Blue, White, Orange</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="visualStyle" class="form-label">Visual Style</label>
+                        <input type="text" class="form-control" id="visualStyle" name="visual_style" 
+                               value="{% if persona and persona.style_guide.visual_preferences %}{{ persona.style_guide.visual_preferences.style }}{% else %}Clean and modern{% endif %}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="textStyle" class="form-label">Text Style</label>
+                        <input type="text" class="form-control" id="textStyle" name="text_style" 
+                               value="{% if persona and persona.style_guide.visual_preferences %}{{ persona.style_guide.visual_preferences.text_style }}{% else %}Bold and readable{% endif %}">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Content Preferences -->
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-list-check me-2"></i>Content Preferences</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="preferredTopics" class="form-label">Preferred Topics</label>
+                            <textarea class="form-control" id="preferredTopics" name="preferred_topics" rows="3">{% if persona and persona.content_preferences %}{{ persona.content_preferences.preferred_topics|join(', ') }}{% endif %}</textarea>
+                            <div class="form-text">Comma-separated list of topics</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="avoidTopics" class="form-label">Topics to Avoid</label>
+                            <textarea class="form-control" id="avoidTopics" name="avoid_topics" rows="3">{% if persona and persona.content_preferences %}{{ persona.content_preferences.avoid_topics|join(', ') }}{% endif %}</textarea>
+                            <div class="form-text">Comma-separated list of topics to avoid</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Actions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-check-lg me-1"></i>
+                    {{ 'Update' if edit_mode else 'Create' }} Persona
+                </button>
+                <a href="{{ url_for('personas_page') }}" class="btn btn-outline-secondary btn-lg">
+                    Cancel
+                </a>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('personaForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const form = e.target;
+    if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        return;
+    }
+    
+    const formData = new FormData(form);
+    
+    // Parse comma-separated fields
+    const parseCommaList = (str) => str ? str.split(',').map(s => s.trim()).filter(s => s) : [];
+    
+    const data = {
+        persona_id: formData.get('persona_id'),
+        name: formData.get('name'),
+        niche: formData.get('niche'),
+        target_audience: formData.get('target_audience'),
+        tone: formData.get('tone'),
+        unique_angle: formData.get('unique_angle'),
+        posting_frequency: formData.get('posting_frequency'),
+        hashtags: parseCommaList(formData.get('hashtags')),
+        hook_style: formData.get('hook_style'),
+        content_style: formData.get('content_style'),
+        cta_style: formData.get('cta_style'),
+        avoid: parseCommaList(formData.get('avoid')),
+        colors: parseCommaList(formData.get('colors')),
+        visual_style: formData.get('visual_style'),
+        text_style: formData.get('text_style'),
+    };
+    
+    const editMode = {{ 'true' if edit_mode else 'false' }};
+    const url = editMode 
+        ? `/api/personas/${data.persona_id}` 
+        : '/api/personas';
+    const method = editMode ? 'PUT' : 'POST';
+    
+    // For PUT, restructure the data
+    if (editMode) {
+        const updateData = {
+            basic_info: {
+                name: data.name,
+                niche: data.niche,
+                target_audience: data.target_audience,
+                tone: data.tone,
+                unique_angle: data.unique_angle,
+                posting_frequency: data.posting_frequency,
+                hashtags: data.hashtags,
+            },
+            style_guide: {
+                hook_style: data.hook_style,
+                content_style: data.content_style,
+                cta_style: data.cta_style,
+                avoid: data.avoid,
+                visual_preferences: {
+                    colors: data.colors,
+                    style: data.visual_style,
+                    text_style: data.text_style,
+                }
+            },
+            content_preferences: {
+                preferred_topics: parseCommaList(formData.get('preferred_topics')),
+                avoid_topics: parseCommaList(formData.get('avoid_topics')),
+            }
+        };
+        Object.assign(data, updateData);
+    }
+    
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(editMode ? data : data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            window.location.href = '{{ url_for("personas_page") }}';
+        } else {
+            alert('Error: ' + result.error);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Error saving persona');
+    }
+});
+</script>
+{% endblock %}

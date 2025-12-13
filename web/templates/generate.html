@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Content - ContentCreationEngine{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>
+            <i class="bi bi-magic text-primary me-2"></i>
+            Generate Content
+        </h1>
+        <p class="text-muted">Configure and run content generation for your personas</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Configuration Form -->
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-sliders me-2"></i>Generation Settings</h5>
+            </div>
+            <div class="card-body">
+                <form id="generateForm">
+                    <div class="mb-4">
+                        <label for="personaSelect" class="form-label">Select Persona *</label>
+                        <select class="form-select form-select-lg" id="personaSelect" name="persona_id" required>
+                            <option value="">Choose a persona...</option>
+                            {% for persona in personas %}
+                            <option value="{{ persona }}" {% if request.args.get('persona') == persona %}selected{% endif %}>
+                                {{ persona }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="aiProvider" class="form-label">AI Provider</label>
+                        <select class="form-select" id="aiProvider" name="ai_provider">
+                            {% for provider in ai_providers %}
+                            <option value="{{ provider }}" {% if provider == current_provider %}selected{% endif %}>
+                                {{ provider|capitalize }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="ideasCount" class="form-label">Number of Ideas</label>
+                        <input type="range" class="form-range" id="ideasCount" name="ideas_count" 
+                               min="1" max="10" value="5">
+                        <div class="d-flex justify-content-between">
+                            <small>1</small>
+                            <strong id="ideasCountValue">5</strong>
+                            <small>10</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label">Data Sources (Platforms)</label>
+                        <div class="row">
+                            {% for platform in platforms %}
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           name="platforms" value="{{ platform }}" 
+                                           id="platform{{ loop.index }}" checked>
+                                    <label class="form-check-label" for="platform{{ loop.index }}">
+                                        {% if platform == 'Instagram' %}
+                                        <i class="bi bi-instagram text-danger"></i>
+                                        {% elif platform == 'Reddit' %}
+                                        <i class="bi bi-reddit text-warning"></i>
+                                        {% elif platform == 'News API' %}
+                                        <i class="bi bi-newspaper text-info"></i>
+                                        {% elif platform == 'YouTube' %}
+                                        <i class="bi bi-youtube text-danger"></i>
+                                        {% elif platform == 'Serper' %}
+                                        <i class="bi bi-google text-primary"></i>
+                                        {% endif %}
+                                        {{ platform }}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="skipScraping" name="skip_scraping">
+                            <label class="form-check-label" for="skipScraping">
+                                Skip Research/Scraping (for testing)
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-lg w-100" id="generateBtn">
+                        <i class="bi bi-magic me-2"></i>
+                        Generate Content
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Progress & Results -->
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-activity me-2"></i>Generation Status</h5>
+            </div>
+            <div class="card-body">
+                <div id="statusIdle" class="text-center py-5 text-muted">
+                    <i class="bi bi-hourglass fs-1"></i>
+                    <p class="mt-3">Configure settings and click "Generate Content" to start</p>
+                </div>
+                
+                <div id="statusRunning" class="d-none">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h5 id="statusMessage">Starting content generation...</h5>
+                        <div class="progress mt-3" style="height: 20px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 id="progressBar" role="progressbar" style="width: 0%">0%</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="statusCompleted" class="d-none">
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                        <strong>Generation Completed!</strong>
+                    </div>
+                    <div class="row text-center mb-4">
+                        <div class="col-4">
+                            <div class="border rounded p-3">
+                                <h3 id="resultIdeas" class="text-primary mb-0">0</h3>
+                                <small class="text-muted">Ideas</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border rounded p-3">
+                                <h3 id="resultScripts" class="text-success mb-0">0</h3>
+                                <small class="text-muted">Scripts</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border rounded p-3">
+                                <h3 id="resultVisuals" class="text-info mb-0">0</h3>
+                                <small class="text-muted">Visuals</small>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="#" id="viewResultLink" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-eye me-1"></i> View Generated Content
+                    </a>
+                </div>
+                
+                <div id="statusFailed" class="d-none">
+                    <div class="alert alert-danger">
+                        <i class="bi bi-x-circle-fill me-2"></i>
+                        <strong>Generation Failed</strong>
+                        <p id="errorMessage" class="mb-0 mt-2"></p>
+                    </div>
+                    <button class="btn btn-outline-primary w-100" onclick="resetStatus()">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Try Again
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Command Line Equivalent -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-terminal me-2"></i>Command Line Equivalent</h5>
+            </div>
+            <div class="card-body">
+                <pre class="bg-dark text-light p-3 rounded mb-0"><code id="cliCommand">python main.py run --persona &lt;select a persona&gt; --ideas 5</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const ideasSlider = document.getElementById('ideasCount');
+const ideasValue = document.getElementById('ideasCountValue');
+const personaSelect = document.getElementById('personaSelect');
+const cliCommand = document.getElementById('cliCommand');
+
+// Update ideas count display
+ideasSlider.addEventListener('input', function() {
+    ideasValue.textContent = this.value;
+    updateCliCommand();
+});
+
+// Update CLI command
+personaSelect.addEventListener('change', updateCliCommand);
+
+function updateCliCommand() {
+    const persona = personaSelect.value || '<select a persona>';
+    const ideas = ideasSlider.value;
+    const skipScraping = document.getElementById('skipScraping').checked ? ' --skip-scraping' : '';
+    cliCommand.textContent = `python main.py run --persona ${persona} --ideas ${ideas}${skipScraping}`;
+}
+
+document.getElementById('skipScraping').addEventListener('change', updateCliCommand);
+
+// Status management
+let currentJobId = null;
+let pollInterval = null;
+
+function showStatus(status) {
+    ['statusIdle', 'statusRunning', 'statusCompleted', 'statusFailed'].forEach(id => {
+        document.getElementById(id).classList.add('d-none');
+    });
+    document.getElementById(`status${status}`).classList.remove('d-none');
+}
+
+function resetStatus() {
+    showStatus('Idle');
+    document.getElementById('generateBtn').disabled = false;
+}
+
+function updateProgress(progress, message) {
+    document.getElementById('progressBar').style.width = `${progress}%`;
+    document.getElementById('progressBar').textContent = `${progress}%`;
+    document.getElementById('statusMessage').textContent = message;
+}
+
+async function pollJobStatus() {
+    if (!currentJobId) return;
+    
+    try {
+        const response = await fetch(`/api/generate/${currentJobId}/status`);
+        const data = await response.json();
+        
+        if (data.status === 'running') {
+            updateProgress(data.progress || 50, data.message || 'Processing...');
+        } else if (data.status === 'completed') {
+            clearInterval(pollInterval);
+            showStatus('Completed');
+            
+            if (data.result) {
+                document.getElementById('resultIdeas').textContent = data.result.ideas_count || 0;
+                document.getElementById('resultScripts').textContent = data.result.scripts_count || 0;
+                document.getElementById('resultVisuals').textContent = data.result.visuals_count || 0;
+                
+                // Extract filename from output_file path
+                if (data.result.output_file) {
+                    const parts = data.result.output_file.split(/[\\\/]/);
+                    const filename = parts[parts.length - 1];
+                    const personaId = parts[parts.length - 2];
+                    document.getElementById('viewResultLink').href = `/content/${personaId}/${filename}`;
+                }
+            }
+            
+            document.getElementById('generateBtn').disabled = false;
+        } else if (data.status === 'failed') {
+            clearInterval(pollInterval);
+            showStatus('Failed');
+            document.getElementById('errorMessage').textContent = data.message || 'Unknown error';
+            document.getElementById('generateBtn').disabled = false;
+        }
+    } catch (err) {
+        console.error('Error polling status:', err);
+    }
+}
+
+// Form submission
+document.getElementById('generateForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const personaId = personaSelect.value;
+    if (!personaId) {
+        alert('Please select a persona');
+        return;
+    }
+    
+    const formData = new FormData(this);
+    const platforms = [];
+    document.querySelectorAll('input[name="platforms"]:checked').forEach(cb => {
+        platforms.push(cb.value);
+    });
+    
+    const data = {
+        persona_id: personaId,
+        ideas_count: parseInt(formData.get('ideas_count')),
+        ai_provider: formData.get('ai_provider'),
+        platforms: platforms,
+        skip_scraping: document.getElementById('skipScraping').checked
+    };
+    
+    document.getElementById('generateBtn').disabled = true;
+    showStatus('Running');
+    updateProgress(0, 'Starting content generation...');
+    
+    try {
+        const response = await fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            currentJobId = result.job_id;
+            updateProgress(10, 'Job started, initializing pipeline...');
+            pollInterval = setInterval(pollJobStatus, 2000);
+        } else {
+            showStatus('Failed');
+            document.getElementById('errorMessage').textContent = result.error || 'Failed to start generation';
+            document.getElementById('generateBtn').disabled = false;
+        }
+    } catch (err) {
+        showStatus('Failed');
+        document.getElementById('errorMessage').textContent = 'Network error: ' + err.message;
+        document.getElementById('generateBtn').disabled = false;
+    }
+});
+
+// Initialize
+updateCliCommand();
+</script>
+{% endblock %}

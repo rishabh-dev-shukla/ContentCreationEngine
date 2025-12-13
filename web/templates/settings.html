@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - ContentCreationEngine{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>
+            <i class="bi bi-gear text-primary me-2"></i>
+            Settings
+        </h1>
+        <p class="text-muted">Manage API keys and application configurations</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- AI Provider Settings -->
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-robot me-2"></i>AI Provider Settings</h5>
+            </div>
+            <div class="card-body">
+                <form id="aiSettingsForm">
+                    <div class="mb-3">
+                        <label for="defaultProvider" class="form-label">Default AI Provider</label>
+                        <select class="form-select" id="defaultProvider" name="DEFAULT_AI_PROVIDER">
+                            <option value="openai" {% if settings.ai.default_provider == 'openai' %}selected{% endif %}>OpenAI</option>
+                            <option value="deepseek" {% if settings.ai.default_provider == 'deepseek' %}selected{% endif %}>DeepSeek</option>
+                            <option value="grok" {% if settings.ai.default_provider == 'grok' %}selected{% endif %}>Grok</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="openaiKey" class="form-label">OpenAI API Key</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="openaiKey" name="OPENAI_API_KEY"
+                                   placeholder="{{ settings.ai.openai_api_key if settings.ai.openai_api_key else 'Not set' }}">
+                            <button class="btn btn-outline-secondary toggle-password" type="button">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="deepseekKey" class="form-label">DeepSeek API Key</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="deepseekKey" name="DEEPSEEK_API_KEY"
+                                   placeholder="{{ settings.ai.deepseek_api_key if settings.ai.deepseek_api_key else 'Not set' }}">
+                            <button class="btn btn-outline-secondary toggle-password" type="button">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="grokKey" class="form-label">Grok API Key</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="grokKey" name="GROK_API_KEY"
+                                   placeholder="{{ settings.ai.grok_api_key if settings.ai.grok_api_key else 'Not set' }}">
+                            <button class="btn btn-outline-secondary toggle-password" type="button">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Platform API Keys -->
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-key me-2"></i>Platform API Keys</h5>
+            </div>
+            <div class="card-body">
+                <form id="platformSettingsForm">
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-instagram text-danger me-1"></i> Instagram
+                        </label>
+                        <input type="password" class="form-control mb-2" name="INSTAGRAM_ACCESS_TOKEN"
+                               placeholder="Access Token {{ settings.instagram.access_token }}">
+                        <input type="text" class="form-control" name="INSTAGRAM_BUSINESS_ACCOUNT_ID"
+                               placeholder="Business Account ID {{ '(' ~ settings.instagram.business_account_id ~ ')' if settings.instagram.business_account_id else '' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-reddit text-warning me-1"></i> Reddit
+                        </label>
+                        <input type="text" class="form-control mb-2" name="REDDIT_CLIENT_ID"
+                               placeholder="Client ID {{ '(' ~ settings.reddit.client_id ~ ')' if settings.reddit.client_id else '' }}">
+                        <input type="password" class="form-control" name="REDDIT_CLIENT_SECRET"
+                               placeholder="Client Secret {{ settings.reddit.client_secret }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-newspaper text-info me-1"></i> News API
+                        </label>
+                        <input type="password" class="form-control" name="NEWS_API_KEY"
+                               placeholder="API Key {{ settings.news.api_key }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-youtube text-danger me-1"></i> YouTube
+                        </label>
+                        <input type="password" class="form-control" name="YOUTUBE_API_KEY"
+                               placeholder="API Key {{ settings.youtube.api_key }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-google text-primary me-1"></i> Serper
+                        </label>
+                        <input type="password" class="form-control" name="SERPER_API_KEY"
+                               placeholder="API Key {{ settings.serper.api_key }}">
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Content Settings -->
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-sliders me-2"></i>Content Settings</h5>
+            </div>
+            <div class="card-body">
+                <form id="contentSettingsForm">
+                    <div class="mb-3">
+                        <label for="ideasPerDay" class="form-label">Ideas Per Day</label>
+                        <input type="number" class="form-control" id="ideasPerDay" 
+                               value="{{ settings.content.ideas_per_day }}" min="1" max="20">
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label for="scriptMinWords" class="form-label">Script Min Words</label>
+                            <input type="number" class="form-control" id="scriptMinWords" 
+                                   value="{{ settings.content.script_min_words }}" min="50">
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label for="scriptMaxWords" class="form-label">Script Max Words</label>
+                            <input type="number" class="form-control" id="scriptMaxWords" 
+                                   value="{{ settings.content.script_max_words }}" min="100">
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Current Status -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>API Status</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        OpenAI
+                        <span class="badge bg-{{ 'success' if settings.ai.openai_api_key and settings.ai.openai_api_key != '***' else 'secondary' }}">
+                            {{ 'Configured' if settings.ai.openai_api_key and settings.ai.openai_api_key != '***' else 'Not Set' }}
+                        </span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        DeepSeek
+                        <span class="badge bg-{{ 'success' if settings.ai.deepseek_api_key and settings.ai.deepseek_api_key != '***' else 'secondary' }}">
+                            {{ 'Configured' if settings.ai.deepseek_api_key and settings.ai.deepseek_api_key != '***' else 'Not Set' }}
+                        </span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Instagram
+                        <span class="badge bg-{{ 'success' if settings.instagram.access_token and settings.instagram.access_token != '***' else 'secondary' }}">
+                            {{ 'Configured' if settings.instagram.access_token and settings.instagram.access_token != '***' else 'Not Set' }}
+                        </span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Reddit
+                        <span class="badge bg-{{ 'success' if settings.reddit.client_id else 'secondary' }}">
+                            {{ 'Configured' if settings.reddit.client_id else 'Not Set' }}
+                        </span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        News API
+                        <span class="badge bg-{{ 'success' if settings.news.api_key and settings.news.api_key != '***' else 'secondary' }}">
+                            {{ 'Configured' if settings.news.api_key and settings.news.api_key != '***' else 'Not Set' }}
+                        </span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        YouTube
+                        <span class="badge bg-{{ 'success' if settings.youtube.api_key and settings.youtube.api_key != '***' else 'secondary' }}">
+                            {{ 'Configured' if settings.youtube.api_key and settings.youtube.api_key != '***' else 'Not Set' }}
+                        </span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Serper
+                        <span class="badge bg-{{ 'success' if settings.serper.api_key and settings.serper.api_key != '***' else 'secondary' }}">
+                            {{ 'Configured' if settings.serper.api_key and settings.serper.api_key != '***' else 'Not Set' }}
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Save Button -->
+<div class="row">
+    <div class="col-12">
+        <button type="button" class="btn btn-primary btn-lg" onclick="saveSettings()">
+            <i class="bi bi-save me-2"></i>Save Settings
+        </button>
+        <p class="text-muted mt-2">
+            <i class="bi bi-info-circle me-1"></i>
+            Settings are saved to the .env file. You may need to restart the application for changes to take effect.
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Toggle password visibility
+document.querySelectorAll('.toggle-password').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const input = this.previousElementSibling;
+        const icon = this.querySelector('i');
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    });
+});
+
+async function saveSettings() {
+    // Collect all form data
+    const data = {};
+    
+    document.querySelectorAll('#aiSettingsForm input, #aiSettingsForm select').forEach(input => {
+        if (input.value && input.name) {
+            data[input.name] = input.value;
+        }
+    });
+    
+    document.querySelectorAll('#platformSettingsForm input').forEach(input => {
+        if (input.value && input.name) {
+            data[input.name] = input.value;
+        }
+    });
+    
+    try {
+        const response = await fetch('/api/settings/env', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert(result.message || 'Settings saved successfully!');
+        } else {
+            alert('Error: ' + result.error);
+        }
+    } catch (err) {
+        alert('Error saving settings: ' + err.message);
+    }
+}
+</script>
+{% endblock %}

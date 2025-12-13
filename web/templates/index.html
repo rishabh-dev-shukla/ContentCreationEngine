@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - ContentCreationEngine{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-speedometer2 text-primary me-2"></i>
+            Dashboard
+        </h1>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">Personas</h6>
+                        <h2 class="mt-2 mb-0">{{ personas|length }}</h2>
+                    </div>
+                    <i class="bi bi-people fs-1 opacity-50"></i>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                <a href="{{ url_for('personas_page') }}" class="text-white text-decoration-none small">
+                    View all <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-success text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">Ideas Generated</h6>
+                        <h2 class="mt-2 mb-0">{{ total_ideas }}</h2>
+                    </div>
+                    <i class="bi bi-lightbulb fs-1 opacity-50"></i>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                <a href="{{ url_for('content_page') }}" class="text-white text-decoration-none small">
+                    View content <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-info text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">Scripts Written</h6>
+                        <h2 class="mt-2 mb-0">{{ total_scripts }}</h2>
+                    </div>
+                    <i class="bi bi-file-earmark-text fs-1 opacity-50"></i>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                <a href="{{ url_for('content_page') }}" class="text-white text-decoration-none small">
+                    View scripts <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-warning text-dark h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">Recent Runs</h6>
+                        <h2 class="mt-2 mb-0">{{ recent_content|length }}</h2>
+                    </div>
+                    <i class="bi bi-clock-history fs-1 opacity-50"></i>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                <a href="{{ url_for('research_page') }}" class="text-dark text-decoration-none small">
+                    View research <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-lightning-charge me-2"></i>Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <form id="quickGenerateForm" class="d-flex gap-2">
+                            <select class="form-select" id="quickPersonaSelect" required>
+                                <option value="">Select Persona...</option>
+                                {% for persona in personas %}
+                                <option value="{{ persona }}">{{ persona }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-primary flex-shrink-0">
+                                <i class="bi bi-magic me-1"></i> Generate
+                            </button>
+                        </form>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="{{ url_for('create_persona_page') }}" class="btn btn-outline-success w-100">
+                            <i class="bi bi-person-plus me-1"></i> Create New Persona
+                        </a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="{{ url_for('generate_page') }}" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-sliders me-1"></i> Advanced Generation
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Content -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-clock me-2"></i>Recent Content</h5>
+                <a href="{{ url_for('content_page') }}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% if recent_content %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Persona</th>
+                                <th>Ideas</th>
+                                <th>Scripts</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for content in recent_content %}
+                            <tr>
+                                <td>{{ content.date }}</td>
+                                <td>
+                                    <span class="badge bg-primary">{{ content.persona_id }}</span>
+                                </td>
+                                <td>{{ content.content_ideas|length if content.content_ideas else 0 }}</td>
+                                <td>{{ content.scripts|length if content.scripts else 0 }}</td>
+                                <td>
+                                    <a href="{{ url_for('view_content_detail', persona_id=content.persona_id, filename=content._filename) }}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox fs-1"></i>
+                    <p class="mt-2">No content generated yet. Start by creating a persona and generating content!</p>
+                    <a href="{{ url_for('generate_page') }}" class="btn btn-primary">
+                        <i class="bi bi-magic me-1"></i> Generate Content
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('quickGenerateForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const personaId = document.getElementById('quickPersonaSelect').value;
+    if (personaId) {
+        window.location.href = `{{ url_for('generate_page') }}?persona=${personaId}`;
+    }
+});
+</script>
+{% endblock %}
