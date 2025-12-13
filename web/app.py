@@ -97,18 +97,53 @@ def index():
     manager = get_persona_manager()
     personas = manager.list_personas()
     
-    # Get recent content
-    recent_content = get_all_content_outputs()[:5]
+    # Get all content for stats
+    all_content = get_all_content_outputs()
+    recent_content = all_content[:5]
     
-    # Get stats
-    total_ideas = sum(len(c.get('content_ideas', [])) for c in recent_content)
-    total_scripts = sum(len(c.get('scripts', [])) for c in recent_content)
+    # Get stats from ALL content
+    total_ideas = sum(len(c.get('content_ideas', [])) for c in all_content)
+    total_scripts = sum(len(c.get('scripts', [])) for c in all_content)
+    
+    # Get research data count
+    research_data = get_all_research_data()
     
     return render_template('index.html',
                           personas=personas,
                           recent_content=recent_content,
                           total_ideas=total_ideas,
-                          total_scripts=total_scripts)
+                          total_scripts=total_scripts,
+                          research_count=len(research_data))
+
+
+# Scripts page for a persona
+@app.route("/scripts/<persona_id>")
+def scripts_page(persona_id):
+    from flask import request
+    status = request.args.get("status", "all")
+    view = request.args.get("view", "table")
+    # Gather all scripts for this persona
+    outputs = get_all_content_outputs(persona_id=persona_id)
+    scripts = []
+    for content in outputs:
+        filename = content.get("_filename")
+        for idx, script in enumerate(content.get("scripts", [])):
+            s = dict(script)
+            s["filename"] = filename
+            s["index"] = idx
+            scripts.append(s)
+    # Filter by status
+    if status in ("approved", "rejected"):
+        scripts = [s for s in scripts if s.get("status") == status]
+    # Sort by most recent (if possible)
+    scripts = sorted(scripts, key=lambda s: s.get("last_edited") or s.get("created_at") or "", reverse=True)
+    return render_template(
+        "scripts.html",
+        persona_id=persona_id,
+        scripts=scripts,
+        status=status,
+        view=view
+    )
 
 
 @app.route('/personas')

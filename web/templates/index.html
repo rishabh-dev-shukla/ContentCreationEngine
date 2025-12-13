@@ -62,7 +62,7 @@
                 </div>
             </div>
             <div class="card-footer bg-transparent border-0">
-                <a href="{{ url_for('content_page') }}" class="text-white text-decoration-none small">
+                <a href="{{ url_for('scripts_page', persona_id=personas[0] if personas else 'default') }}" class="text-white text-decoration-none small">
                     View scripts <i class="bi bi-arrow-right"></i>
                 </a>
             </div>
@@ -73,10 +73,10 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h6 class="card-title mb-0">Recent Runs</h6>
-                        <h2 class="mt-2 mb-0">{{ recent_content|length }}</h2>
+                        <h6 class="card-title mb-0">Research Data</h6>
+                        <h2 class="mt-2 mb-0">{{ research_count }}</h2>
                     </div>
-                    <i class="bi bi-clock-history fs-1 opacity-50"></i>
+                    <i class="bi bi-search fs-1 opacity-50"></i>
                 </div>
             </div>
             <div class="card-footer bg-transparent border-0">
