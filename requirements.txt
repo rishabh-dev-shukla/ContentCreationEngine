@@ -25,6 +25,10 @@ python-dateutil>=2.8.0
 # Web Framework
 Flask>=3.0.0
 websockets==14.1
+gunicorn>=21.2.0
+
+# Firebase
+firebase-admin>=6.2.0
 
 # Testing
 pytest>=7.4.0

@@ -8,11 +8,11 @@ import json
 import os
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from threading import Thread
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, g
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -23,6 +23,10 @@ from src.content_creation_engine.persona import PersonaManager
 from src.content_creation_engine.scheduler import ContentPipeline
 from src.content_creation_engine.scheduler.daily_workflow import ContentOutput
 from src.content_creation_engine.generators import InsightsAnalyzer
+from web.auth import (
+    login_required, admin_required, get_current_user, get_current_customer_id,
+    set_current_customer, verify_firebase_token, login_user, logout_user, get_user_customers
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -32,14 +36,55 @@ app = Flask(__name__,
             template_folder='templates',
             static_folder='static')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
+app.permanent_session_lifetime = timedelta(days=7)
+
+# Firebase configuration for client-side SDK
+FIREBASE_CONFIG = {
+    'apiKey': os.getenv('FIREBASE_API_KEY', ''),
+    'authDomain': os.getenv('FIREBASE_AUTH_DOMAIN', ''),
+    'projectId': os.getenv('FIREBASE_PROJECT_ID', 'content-engine-8be02'),
+    'storageBucket': os.getenv('FIREBASE_STORAGE_BUCKET', ''),
+    'messagingSenderId': os.getenv('FIREBASE_MESSAGING_SENDER_ID', ''),
+    'appId': os.getenv('FIREBASE_APP_ID', '')
+}
 
 # Global state for tracking generation jobs
 generation_jobs = {}
 insights_jobs = {}
 
 
-def get_persona_manager():
-    """Get a PersonaManager instance."""
+# =============================================================================
+# Context Processor - Make auth info available to all templates
+# =============================================================================
+
+@app.context_processor
+def inject_auth():
+    """Inject authentication info into all templates."""
+    user = get_current_user()
+    customer_id = get_current_customer_id()
+    customers = get_user_customers() if user else []
+    return {
+        'current_user': user,
+        'current_customer_id': customer_id,
+        'user_customers': customers
+    }
+
+
+def get_persona_manager(customer_id: str = None):
+    """
+    Get a PersonaManager instance.
+    Uses Firebase if a customer_id is provided, otherwise falls back to local files.
+    """
+    from src.content_creation_engine.persona import get_persona_manager as get_pm
+    
+    # Try to get customer_id from session if not provided
+    if not customer_id:
+        customer_id = get_current_customer_id()
+    
+    if customer_id:
+        return get_pm(customer_id=customer_id, use_firebase=True)
+    
+    # Fall back to local PersonaManager
     return PersonaManager()
 
 
@@ -90,10 +135,81 @@ def get_all_research_data() -> list:
 
 
 # =============================================================================
+# Routes - Authentication
+# =============================================================================
+
+@app.route('/login')
+def login_page():
+    """Login page."""
+    # If already logged in, redirect to dashboard
+    if get_current_user():
+        return redirect(url_for('index'))
+    
+    return render_template('login.html', firebase_config=json.dumps(FIREBASE_CONFIG))
+
+
+@app.route('/logout')
+def logout():
+    """Logout and redirect to login page."""
+    logout_user()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('login_page'))
+
+
+@app.route('/switch-customer/<customer_id>')
+@login_required
+def switch_customer(customer_id):
+    """Switch the current customer context."""
+    user = get_current_user()
+    
+    # Verify user has access to this customer
+    if customer_id not in user.get('customers', []):
+        flash('You do not have access to this customer.', 'error')
+        return redirect(url_for('index'))
+    
+    set_current_customer(customer_id)
+    flash(f'Switched to customer: {customer_id}', 'success')
+    return redirect(url_for('index'))
+
+
+@app.route('/api/auth/verify', methods=['POST'])
+def api_verify_auth():
+    """API: Verify Firebase ID token and create session."""
+    data = request.json
+    id_token = data.get('id_token')
+    
+    if not id_token:
+        return jsonify({'success': False, 'error': 'Missing ID token'}), 400
+    
+    # Verify token and get user data
+    user_data = verify_firebase_token(id_token)
+    
+    if not user_data:
+        return jsonify({
+            'success': False, 
+            'error': 'User not authorized. Please contact your administrator.'
+        }), 401
+    
+    # Log the user in
+    login_user(user_data)
+    
+    return jsonify({
+        'success': True,
+        'user': {
+            'email': user_data.get('email'),
+            'name': user_data.get('name'),
+            'role': user_data.get('role')
+        },
+        'redirect': url_for('index')
+    })
+
+
+# =============================================================================
 # Routes - Pages
 # =============================================================================
 
 @app.route('/')
+@login_required
 def index():
     """Dashboard home page."""
     manager = get_persona_manager()
@@ -126,6 +242,7 @@ def index():
 # Scripts page for a persona
 @app.route("/scripts")
 @app.route("/scripts/<persona_id>")
+@login_required
 def scripts_page(persona_id=None):
     from flask import request
     manager = get_persona_manager()
@@ -166,6 +283,7 @@ def scripts_page(persona_id=None):
 
 
 @app.route('/personas')
+@login_required
 def personas_page():
     """Personas management page."""
     manager = get_persona_manager()
@@ -183,12 +301,14 @@ def personas_page():
 
 
 @app.route('/personas/create')
+@login_required
 def create_persona_page():
     """Create new persona page."""
     return render_template('persona_form.html', persona=None, edit_mode=False)
 
 
 @app.route('/personas/<persona_id>/edit')
+@login_required
 def edit_persona_page(persona_id):
     """Edit persona page."""
     manager = get_persona_manager()
@@ -201,6 +321,7 @@ def edit_persona_page(persona_id):
 
 
 @app.route('/generate')
+@login_required
 def generate_page():
     """Content generation page."""
     manager = get_persona_manager()
@@ -221,6 +342,7 @@ def generate_page():
 
 
 @app.route('/content')
+@login_required
 def content_page():
     """View generated content page."""
     manager = get_persona_manager()
@@ -239,6 +361,7 @@ def content_page():
 
 
 @app.route('/content/<persona_id>/<filename>')
+@login_required
 def view_content_detail(persona_id, filename):
     """View detailed content output."""
     file_path = settings.output_dir / persona_id / filename
@@ -260,6 +383,7 @@ def view_content_detail(persona_id, filename):
 
 
 @app.route('/research')
+@login_required
 def research_page():
     """View research data page."""
     research_data = get_all_research_data()
@@ -267,6 +391,7 @@ def research_page():
 
 
 @app.route('/insights')
+@login_required
 def insights_page():
     """View insights page."""
     manager = get_persona_manager()
@@ -296,6 +421,7 @@ def insights_page():
 
 
 @app.route('/insights/<persona_id>/<filename>')
+@login_required
 def view_insights_detail(persona_id, filename):
     """View detailed insights."""
     insights_dir = settings.output_dir / "insights" / persona_id
@@ -318,6 +444,7 @@ def view_insights_detail(persona_id, filename):
 
 
 @app.route('/settings')
+@login_required
 def settings_page():
     """Settings page for API keys and configurations."""
     # Get current settings (mask API keys)
@@ -363,6 +490,7 @@ def settings_page():
 # =============================================================================
 
 @app.route('/api/personas', methods=['GET'])
+@login_required
 def api_list_personas():
     """API: List all personas."""
     manager = get_persona_manager()
@@ -385,6 +513,7 @@ def api_list_personas():
 
 
 @app.route('/api/personas', methods=['POST'])
+@login_required
 def api_create_persona():
     """API: Create a new persona."""
     data = request.json
@@ -422,6 +551,7 @@ def api_create_persona():
 
 
 @app.route('/api/personas/<persona_id>', methods=['GET'])
+@login_required
 def api_get_persona(persona_id):
     """API: Get a specific persona."""
     manager = get_persona_manager()
@@ -433,6 +563,7 @@ def api_get_persona(persona_id):
 
 
 @app.route('/api/personas/<persona_id>', methods=['PUT'])
+@login_required
 def api_update_persona(persona_id):
     """API: Update a persona."""
     data = request.json
@@ -464,6 +595,7 @@ def api_update_persona(persona_id):
 
 
 @app.route('/api/personas/<persona_id>', methods=['DELETE'])
+@login_required
 def api_delete_persona(persona_id):
     """API: Delete a persona."""
     manager = get_persona_manager()
@@ -480,6 +612,7 @@ def api_delete_persona(persona_id):
 
 
 @app.route('/api/generate', methods=['POST'])
+@login_required
 def api_generate_content():
     """API: Start content generation."""
     data = request.json
@@ -549,6 +682,7 @@ def api_generate_content():
 
 
 @app.route('/api/generate/<job_id>/status', methods=['GET'])
+@login_required
 def api_generation_status(job_id):
     """API: Get generation job status."""
     if job_id not in generation_jobs:
@@ -562,6 +696,7 @@ def api_generation_status(job_id):
 # =============================================================================
 
 @app.route('/api/insights/research-runs', methods=['GET'])
+@login_required
 def api_get_research_runs():
     """API: Get research runs for a specific persona."""
     persona_id = request.args.get('persona_id')
@@ -584,6 +719,7 @@ def api_get_research_runs():
     return jsonify(research_runs)
 
 @app.route('/api/insights/generate', methods=['POST'])
+@login_required
 def api_generate_insights():
     """API: Start insights analysis."""
     data = request.json
@@ -675,6 +811,7 @@ def api_generate_insights():
 
 
 @app.route('/api/insights/<job_id>/status', methods=['GET'])
+@login_required
 def api_insights_status(job_id):
     """API: Get insights job status."""
     if job_id not in insights_jobs:
@@ -684,6 +821,7 @@ def api_insights_status(job_id):
 
 
 @app.route('/api/insights', methods=['GET'])
+@login_required
 def api_list_insights():
     """API: List all insights."""
     persona_id = request.args.get('persona_id')
@@ -705,6 +843,7 @@ def api_list_insights():
 
 
 @app.route('/api/content', methods=['GET'])
+@login_required
 def api_list_content():
     """API: List all generated content."""
     persona_id = request.args.get('persona_id')
@@ -726,6 +865,7 @@ def api_list_content():
 
 
 @app.route('/api/content/<persona_id>/<filename>', methods=['GET'])
+@login_required
 def api_get_content(persona_id, filename):
     """API: Get specific content output."""
     file_path = settings.output_dir / persona_id / filename
@@ -742,6 +882,7 @@ def api_get_content(persona_id, filename):
 
 
 @app.route('/api/content/<persona_id>/<filename>/idea/<int:idea_index>', methods=['PUT'])
+@login_required
 def api_update_idea(persona_id, filename, idea_index):
     """API: Update a specific idea (edit/approve/reject)."""
     file_path = settings.output_dir / persona_id / filename
@@ -781,6 +922,7 @@ def api_update_idea(persona_id, filename, idea_index):
 
 
 @app.route('/api/content/<persona_id>/<filename>/script/<int:script_index>', methods=['PUT'])
+@login_required
 def api_update_script(persona_id, filename, script_index):
     """API: Update a specific script."""
     file_path = settings.output_dir / persona_id / filename
@@ -820,6 +962,7 @@ def api_update_script(persona_id, filename, script_index):
 
 
 @app.route('/api/research', methods=['GET'])
+@login_required
 def api_list_research():
     """API: List all research data."""
     research_data = get_all_research_data()
@@ -827,6 +970,7 @@ def api_list_research():
 
 
 @app.route('/api/settings', methods=['GET'])
+@login_required
 def api_get_settings():
     """API: Get current settings (masked)."""
     return jsonify({
@@ -836,6 +980,7 @@ def api_get_settings():
 
 
 @app.route('/api/settings/env', methods=['POST'])
+@login_required
 def api_update_env():
     """API: Update .env file with new settings."""
     data = request.json
@@ -913,6 +1058,7 @@ def get_recent_videos() -> list:
 
 
 @app.route('/video-generator')
+@login_required
 def video_generator_page():
     """Video generator page."""
     default_output_dir = str(VIDEO_OUTPUT_DIR)
@@ -924,6 +1070,7 @@ def video_generator_page():
 
 
 @app.route('/api/video/generate', methods=['POST'])
+@login_required
 def api_generate_video():
     """API: Generate an AI video with watermark removal."""
     data = request.json

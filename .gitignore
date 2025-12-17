@@ -99,12 +99,23 @@ celerybeat.pid
 
 # Environments
 .env
+.env.local
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Firebase credentials
+database/*.json
+firebase_env_credential.txt
+
+# Local data (use Firebase instead)
+data/output/
+data/personas/
+data/research_cache/
+data/video_outputs/
 
 # Spyder project settings
 .spyderproject
