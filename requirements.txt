@@ -24,7 +24,12 @@ python-dateutil>=2.8.0
 
 # Web Framework
 Flask>=3.0.0
+websockets==14.1
 
 # Testing
 pytest>=7.4.0
 pytest-cov>=4.1.0
+
+# Video Generation
+moviepy==2.1.1
+

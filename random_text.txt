@@ -1,0 +1,2 @@
+I have created a new folder 'video_gen' in my project 'ContentCreationEngine' that contains code for generating videos using AI. 
+The folder includes three files: 'math_ai_video_generator.py', 'demo_automated_video.py', and 'process_video.py'.

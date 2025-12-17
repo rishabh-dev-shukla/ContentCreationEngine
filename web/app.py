@@ -22,6 +22,7 @@ from config.settings import settings, Settings
 from src.content_creation_engine.persona import PersonaManager
 from src.content_creation_engine.scheduler import ContentPipeline
 from src.content_creation_engine.scheduler.daily_workflow import ContentOutput
+from src.content_creation_engine.generators import InsightsAnalyzer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +35,7 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-product
 
 # Global state for tracking generation jobs
 generation_jobs = {}
+insights_jobs = {}
 
 
 def get_persona_manager():
@@ -108,37 +110,54 @@ def index():
     # Get research data count
     research_data = get_all_research_data()
     
+    # Get insights count
+    analyzer = InsightsAnalyzer()
+    all_insights = analyzer.list_insights()
+    
     return render_template('index.html',
                           personas=personas,
                           recent_content=recent_content,
                           total_ideas=total_ideas,
                           total_scripts=total_scripts,
-                          research_count=len(research_data))
+                          research_count=len(research_data),
+                          insights_count=len(all_insights))
 
 
 # Scripts page for a persona
+@app.route("/scripts")
 @app.route("/scripts/<persona_id>")
-def scripts_page(persona_id):
+def scripts_page(persona_id=None):
     from flask import request
+    manager = get_persona_manager()
+    personas = manager.list_personas()
+    
+    # Default to first persona if none selected
+    if not persona_id and personas:
+        persona_id = personas[0]
+    
     status = request.args.get("status", "all")
     view = request.args.get("view", "table")
+    
     # Gather all scripts for this persona
-    outputs = get_all_content_outputs(persona_id=persona_id)
     scripts = []
-    for content in outputs:
-        filename = content.get("_filename")
-        for idx, script in enumerate(content.get("scripts", [])):
-            s = dict(script)
-            s["filename"] = filename
-            s["index"] = idx
-            scripts.append(s)
-    # Filter by status
-    if status in ("approved", "rejected"):
-        scripts = [s for s in scripts if s.get("status") == status]
-    # Sort by most recent (if possible)
-    scripts = sorted(scripts, key=lambda s: s.get("last_edited") or s.get("created_at") or "", reverse=True)
+    if persona_id:
+        outputs = get_all_content_outputs(persona_id=persona_id)
+        for content in outputs:
+            filename = content.get("_filename")
+            for idx, script in enumerate(content.get("scripts", [])):
+                s = dict(script)
+                s["filename"] = filename
+                s["index"] = idx
+                scripts.append(s)
+        # Filter by status
+        if status in ("approved", "rejected"):
+            scripts = [s for s in scripts if s.get("status") == status]
+        # Sort by most recent (if possible)
+        scripts = sorted(scripts, key=lambda s: s.get("last_edited") or s.get("created_at") or "", reverse=True)
+    
     return render_template(
         "scripts.html",
+        personas=personas,
         persona_id=persona_id,
         scripts=scripts,
         status=status,
@@ -245,6 +264,57 @@ def research_page():
     """View research data page."""
     research_data = get_all_research_data()
     return render_template('research.html', research_data=research_data)
+
+
+@app.route('/insights')
+def insights_page():
+    """View insights page."""
+    manager = get_persona_manager()
+    personas = manager.list_personas()
+    
+    # Get all insights
+    analyzer = InsightsAnalyzer()
+    all_insights = analyzer.list_insights()
+    
+    # Get all research runs with metadata
+    research_runs = []
+    for research in get_all_research_data():
+        source_count = sum(
+            len(v) if isinstance(v, list) else 0 
+            for v in research.get('data', {}).values()
+        )
+        research_runs.append({
+            'date': research['date'],
+            'filename': research['filename'],
+            'source_count': source_count
+        })
+    
+    return render_template('insights.html', 
+                          personas=personas, 
+                          insights_list=all_insights,
+                          research_runs=research_runs)
+
+
+@app.route('/insights/<persona_id>/<filename>')
+def view_insights_detail(persona_id, filename):
+    """View detailed insights."""
+    insights_dir = settings.output_dir / "insights" / persona_id
+    file_path = insights_dir / filename
+    
+    if not file_path.exists():
+        flash('Insights file not found', 'error')
+        return redirect(url_for('insights_page'))
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            insights = json.load(f)
+        return render_template('insights_detail.html',
+                              insights=insights,
+                              persona_id=persona_id,
+                              filename=filename)
+    except Exception as e:
+        flash(f'Error loading insights: {e}', 'error')
+        return redirect(url_for('insights_page'))
 
 
 @app.route('/settings')
@@ -487,6 +557,153 @@ def api_generation_status(job_id):
     return jsonify(generation_jobs[job_id])
 
 
+# =============================================================================
+# API Routes - Insights
+# =============================================================================
+
+@app.route('/api/insights/research-runs', methods=['GET'])
+def api_get_research_runs():
+    """API: Get research runs for a specific persona."""
+    persona_id = request.args.get('persona_id')
+    if not persona_id:
+        return jsonify({'error': 'Missing persona_id'}), 400
+    
+    # Get all research runs
+    research_runs = []
+    for research in get_all_research_data():
+        source_count = sum(
+            len(v) if isinstance(v, list) else 0 
+            for v in research.get('data', {}).values()
+        )
+        research_runs.append({
+            'date': research['date'],
+            'filename': research['filename'],
+            'source_count': source_count
+        })
+    
+    return jsonify(research_runs)
+
+@app.route('/api/insights/generate', methods=['POST'])
+def api_generate_insights():
+    """API: Start insights analysis."""
+    data = request.json
+    
+    persona_id = data.get('persona_id')
+    if not persona_id:
+        return jsonify({'error': 'Missing persona_id'}), 400
+    
+    research_file = data.get('research_file')
+    if not research_file:
+        return jsonify({'error': 'Missing research_file'}), 400
+    
+    analysis_types = data.get('analysis_types', None)  # None means all types
+    
+    # Create a unique job ID
+    job_id = f"insights_{persona_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
+    # Mark job as running
+    insights_jobs[job_id] = {
+        'status': 'running',
+        'persona_id': persona_id,
+        'started_at': datetime.now().isoformat(),
+        'progress': 0,
+        'message': 'Starting insights analysis...'
+    }
+    
+    def run_analysis():
+        try:
+            manager = get_persona_manager()
+            persona = manager.load_persona(persona_id)
+            
+            if not persona:
+                insights_jobs[job_id]['status'] = 'failed'
+                insights_jobs[job_id]['message'] = f'Persona {persona_id} not found'
+                return
+            
+            insights_jobs[job_id]['message'] = 'Loading research data...'
+            insights_jobs[job_id]['progress'] = 10
+            
+            # Load selected research file
+            research_data = {}
+            research_file_path = settings.research_cache_dir / research_file
+            if research_file_path.exists():
+                try:
+                    with open(research_file_path, 'r', encoding='utf-8') as f:
+                        research_data = json.load(f)
+                except Exception as e:
+                    logger.error(f"Error loading research file: {e}")
+            
+            if not research_data:
+                insights_jobs[job_id]['status'] = 'failed'
+                insights_jobs[job_id]['message'] = 'No research data available. Run research first.'
+                return
+            
+            insights_jobs[job_id]['message'] = 'Analyzing research data...'
+            insights_jobs[job_id]['progress'] = 25
+            
+            analyzer = InsightsAnalyzer()
+            insights = analyzer.analyze_research_data(
+                research_data=research_data,
+                persona=persona,
+                analysis_types=analysis_types
+            )
+            
+            insights_jobs[job_id]['message'] = 'Saving insights...'
+            insights_jobs[job_id]['progress'] = 90
+            
+            output_file = analyzer.save_insights(insights, persona_id)
+            
+            insights_jobs[job_id]['status'] = 'completed'
+            insights_jobs[job_id]['progress'] = 100
+            insights_jobs[job_id]['message'] = 'Insights analysis completed!'
+            insights_jobs[job_id]['result'] = {
+                'output_file': str(output_file),
+                'filename': output_file.name,
+                'analyses_count': len(insights.get('analyses', {}))
+            }
+            
+        except Exception as e:
+            logger.error(f"Insights generation error: {e}")
+            insights_jobs[job_id]['status'] = 'failed'
+            insights_jobs[job_id]['message'] = str(e)
+    
+    # Run in background thread
+    thread = Thread(target=run_analysis)
+    thread.start()
+    
+    return jsonify({'job_id': job_id, 'status': 'started'})
+
+
+@app.route('/api/insights/<job_id>/status', methods=['GET'])
+def api_insights_status(job_id):
+    """API: Get insights job status."""
+    if job_id not in insights_jobs:
+        return jsonify({'error': 'Job not found'}), 404
+    
+    return jsonify(insights_jobs[job_id])
+
+
+@app.route('/api/insights', methods=['GET'])
+def api_list_insights():
+    """API: List all insights."""
+    persona_id = request.args.get('persona_id')
+    analyzer = InsightsAnalyzer()
+    insights_list = analyzer.list_insights(persona_id)
+    
+    # Simplify for API response
+    simplified = []
+    for insight in insights_list:
+        simplified.append({
+            'generated_at': insight.get('generated_at'),
+            'persona_id': insight.get('persona_id'),
+            'niche': insight.get('niche'),
+            'analyses_count': len(insight.get('analyses', {})),
+            'filename': insight.get('_filename')
+        })
+    
+    return jsonify({'insights': simplified})
+
+
 @app.route('/api/content', methods=['GET'])
 def api_list_content():
     """API: List all generated content."""
@@ -648,6 +865,174 @@ def api_update_env():
         return jsonify({'success': True, 'message': 'Settings saved. Restart the app to apply changes.'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# Routes - Video Generator
+# =============================================================================
+
+# Default output directory for video generation
+VIDEO_OUTPUT_DIR = settings.output_dir / "video_outputs"
+
+# Store video generation jobs
+video_generation_jobs = {}
+
+
+def get_recent_videos() -> list:
+    """Get list of recently generated videos."""
+    videos = []
+    video_dir = VIDEO_OUTPUT_DIR
+    
+    if not video_dir.exists():
+        return videos
+    
+    # Get all timestamped folders
+    for folder in sorted(video_dir.iterdir(), reverse=True):
+        if folder.is_dir() and folder.name.startswith('video_'):
+            # Check for video files
+            video_files = list(folder.glob('*.mp4'))
+            if video_files:
+                # Try to read metadata if exists
+                metadata_file = folder / 'metadata.json'
+                metadata = {}
+                if metadata_file.exists():
+                    try:
+                        with open(metadata_file, 'r', encoding='utf-8') as f:
+                            metadata = json.load(f)
+                    except:
+                        pass
+                
+                videos.append({
+                    'created_at': folder.name.replace('video_', ''),
+                    'problem': metadata.get('problem', 'Unknown'),
+                    'output_folder': str(folder),
+                    'status': 'completed'
+                })
+    
+    return videos[:10]  # Return only the 10 most recent
+
+
+@app.route('/video-generator')
+def video_generator_page():
+    """Video generator page."""
+    default_output_dir = str(VIDEO_OUTPUT_DIR)
+    recent_videos = get_recent_videos()
+    
+    return render_template('video_generator.html',
+                          default_output_dir=default_output_dir,
+                          recent_videos=recent_videos)
+
+
+@app.route('/api/video/generate', methods=['POST'])
+def api_generate_video():
+    """API: Generate an AI video with watermark removal."""
+    data = request.json
+    
+    # Extract parameters
+    problem_statement = data.get('problem_statement', '').strip()
+    background_color = data.get('background_color', '#FFFFFF')
+    api_type = data.get('api_type', 'prism')  # 'prism' or 'grant'
+    video_quality = data.get('video_quality', 'high')  # 'low', 'medium', 'high', 'production'
+    output_dir = data.get('output_dir', str(VIDEO_OUTPUT_DIR))
+    
+    # Default watermark patch settings (not exposed to users)
+    patch_width = 400
+    patch_height = 70
+    patch_position = 'bottom-right'
+    
+    # Validate required fields
+    if not problem_statement:
+        return jsonify({'success': False, 'error': 'Problem statement is required'}), 400
+    
+    # Convert hex color to RGB tuple for watermark patch
+    def hex_to_rgb(hex_color):
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    
+    try:
+        patch_color = hex_to_rgb(background_color)
+    except:
+        patch_color = (255, 255, 255)  # Default to white
+    
+    try:
+        # Import video generation modules
+        from video_gen.math_ai_video_generator import generate_math_ai_video
+        from video_gen.process_video import remove_watermark_with_patch
+        import time
+        
+        # Step 1: Generate video using Knolify API
+        logger.info(f"Generating video for problem: {problem_statement[:50]}...")
+        logger.info(f"Using {api_type.upper()} API with background color: {background_color}")
+        
+        result = generate_math_ai_video(
+            math_problem=problem_statement,
+            api_type=api_type,
+            background_color=background_color,
+            quality=video_quality,
+            remove_watermark=False  # We'll process manually
+        )
+        
+        video_url = result.get('video_link')
+        if not video_url:
+            raise Exception("No video URL returned from Knolify API")
+        
+        logger.info(f"Video generated: {video_url}")
+        
+        # Step 2: Create output directory with timestamp
+        timestamp = int(time.time())
+        output_folder = Path(output_dir) / f"video_{timestamp}"
+        output_folder.mkdir(parents=True, exist_ok=True)
+        output_path = output_folder / "video_processed.mp4"
+        
+        # Step 3: Remove watermark with patch (using same background color)
+        logger.info(f"Removing watermark with {patch_color} patch...")
+        processed_video = remove_watermark_with_patch(
+            video_input=video_url,
+            output_path=str(output_path),
+            patch_width=patch_width,
+            patch_height=patch_height,
+            patch_color=patch_color,
+            position=patch_position,
+            margin_x=0,
+            margin_y=0
+        )
+        
+        # Step 4: Save metadata
+        metadata = {
+            'problem': problem_statement,
+            'background_color': background_color,
+            'api_type': api_type,
+            'video_quality': video_quality,
+            'original_url': video_url,
+            'vtt_file': result.get('vtt_file'),
+            'srt_file': result.get('srt_file'),
+            'processed_video': str(processed_video),
+            'created_at': datetime.now().isoformat()
+        }
+        
+        metadata_path = output_folder / 'metadata.json'
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=2)
+        
+        logger.info(f"Video processing complete: {processed_video}")
+        
+        return jsonify({
+            'success': True,
+            'processed_video': str(processed_video),
+            'original_url': video_url,
+            'vtt_file': result.get('vtt_file'),
+            'srt_file': result.get('srt_file'),
+            'output_folder': str(output_folder)
+        })
+        
+    except Exception as e:
+        logger.error(f"Video generation error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 # =============================================================================

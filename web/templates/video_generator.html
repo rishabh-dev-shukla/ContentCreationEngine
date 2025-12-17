@@ -1,0 +1,464 @@
+{% extends "base.html" %}
+
+{% block title %}Video Generator - ContentCreationEngine{% endblock %}
+
+{% block extra_css %}
+<style>
+    .color-preview {
+        width: 40px;
+        height: 40px;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    .video-preview {
+        max-width: 100%;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>
+            <i class="bi bi-camera-video text-primary me-2"></i>
+            AI Video Generator
+        </h1>
+        <p class="text-muted">Generate explanatory videos using our AI video generator.</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Video Generation Form -->
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-sliders me-2"></i>Video Settings</h5>
+            </div>
+            <div class="card-body">
+                <form id="videoGenerateForm">
+                    <!-- Problem Statement -->
+                    <div class="mb-4">
+                        <label for="problemStatement" class="form-label">
+                            <i class="bi bi-question-circle me-1"></i>Problem Statement *
+                        </label>
+                        <textarea class="form-control" id="problemStatement" name="problem_statement" 
+                                  rows="5" required placeholder="Enter your math problem here...
+Example: Solve for x: 2x + 5 = 15
+
+Or: Find the area of a circle with radius 5cm.
+
+Or: Explain how to find the derivative of f(x) = x² + 3x + 2"></textarea>
+                        <div class="form-text">Enter a detailed math problem or question for the AI to explain.</div>
+                    </div>
+
+                    <!-- API Type Selection -->
+                    <div class="mb-4">
+                        <label for="apiType" class="form-label">
+                            <i class="bi bi-cpu me-1"></i>Generation Mode
+                        </label>
+                        <select class="form-select" id="apiType" name="api_type">
+                            <option value="prism" selected>High Quality (Recommended)</option>
+                            <option value="grant">Fast Generation</option>
+                        </select>
+                        <div class="form-text">High quality produces better videos with rich animations. Fast generation is quicker but simpler.</div>
+                    </div>
+
+                    <!-- Background Color -->
+                    <div class="mb-4">
+                        <label for="backgroundColor" class="form-label">
+                            <i class="bi bi-palette me-1"></i>Background Color
+                        </label>
+                        <div class="input-group">
+                            <input type="color" class="form-control form-control-color color-preview" 
+                                   id="backgroundColor" name="background_color" value="#FFFFFF" 
+                                   title="Choose background color">
+                            <input type="text" class="form-control" id="backgroundColorHex" 
+                                   value="#FFFFFF" placeholder="#FFFFFF" readonly>
+                            <button type="button" class="btn btn-outline-secondary dropdown-toggle" 
+                                    data-bs-toggle="dropdown">
+                                Presets
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="#" data-color="#FFFFFF">
+                                    <span class="color-swatch d-inline-block me-2" style="width:20px;height:20px;background:#FFF;border:1px solid #ddd;"></span> White
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" data-color="#000000">
+                                    <span class="color-swatch d-inline-block me-2" style="width:20px;height:20px;background:#000;"></span> Black
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" data-color="#1a1a2e">
+                                    <span class="color-swatch d-inline-block me-2" style="width:20px;height:20px;background:#1a1a2e;"></span> Dark Blue
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" data-color="#0f3460">
+                                    <span class="color-swatch d-inline-block me-2" style="width:20px;height:20px;background:#0f3460;"></span> Navy
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" data-color="#2c3e50">
+                                    <span class="color-swatch d-inline-block me-2" style="width:20px;height:20px;background:#2c3e50;"></span> Slate
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" data-color="#f5f5f5">
+                                    <span class="color-swatch d-inline-block me-2" style="width:20px;height:20px;background:#f5f5f5;border:1px solid #ddd;"></span> Light Gray
+                                </a></li>
+                            </ul>
+                        </div>
+                        <div class="form-text">Select the background color for the video. This will also be used to cover the watermark.</div>
+                    </div>
+
+                    <!-- Video Quality (for Prism) -->
+                    <div class="mb-4" id="qualitySection">
+                        <label for="videoQuality" class="form-label">
+                            <i class="bi bi-stars me-1"></i>Video Quality
+                        </label>
+                        <select class="form-select" id="videoQuality" name="video_quality">
+                            <option value="high" selected>High (Default)</option>
+                            <option value="production">Production (Best)</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low (Fastest)</option>
+                        </select>
+                        <div class="form-text">Higher quality takes longer to generate. Only available for Prism mode.</div>
+                    </div>
+
+                    <!-- Output Directory -->
+                    <div class="mb-4">
+                        <label for="outputDir" class="form-label">
+                            <i class="bi bi-folder me-1"></i>Output Directory
+                        </label>
+                        <input type="text" class="form-control" id="outputDir" name="output_dir" 
+                               value="{{ default_output_dir }}" placeholder="D:\path\to\output">
+                        <div class="form-text">A new timestamped folder will be created inside this directory for each video.</div>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button type="submit" class="btn btn-primary btn-lg w-100" id="generateBtn">
+                        <i class="bi bi-play-circle me-2"></i>
+                        Generate Video
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress & Results -->
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-activity me-2"></i>Generation Status</h5>
+            </div>
+            <div class="card-body">
+                <!-- Idle State -->
+                <div id="statusIdle" class="text-center py-5 text-muted">
+                    <i class="bi bi-camera-video fs-1"></i>
+                    <p class="mt-3">Configure your settings and click "Generate Video" to start</p>
+                    <small class="d-block text-muted mt-2">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Video generation typically takes 1-3 minutes depending on problem complexity
+                    </small>
+                </div>
+
+                <!-- Running State -->
+                <div id="statusRunning" class="d-none">
+                    <div class="text-center py-5">
+                        <div class="position-relative d-inline-block mb-4">
+                            <svg width="120" height="120">
+                                <circle cx="60" cy="60" r="50" fill="none" stroke="#e9ecef" stroke-width="8"/>
+                                <circle id="progressCircle" cx="60" cy="60" r="50" fill="none" stroke="#0d6efd" stroke-width="8"
+                                        stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round"
+                                        transform="rotate(-90 60 60)" style="transition: stroke-dashoffset 0.5s ease;"/>
+                            </svg>
+                            <div class="position-absolute top-50 start-50 translate-middle">
+                                <h3 class="mb-0" id="progressPercent">0%</h3>
+                            </div>
+                        </div>
+                        <h5 class="text-primary">Video generation in progress...</h5>
+                        <p class="text-muted">This may take a few minutes</p>
+                    </div>
+                </div>
+
+                <!-- Completed State -->
+                <div id="statusCompleted" class="d-none">
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                        <strong>Video Generated Successfully!</strong>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h6><i class="bi bi-folder me-2"></i>Output Location</h6>
+                        <div class="bg-light p-3 rounded">
+                            <code id="outputVideoPath" class="text-break" style="font-size: 0.9rem;"></code>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-primary flex-grow-1" id="openFolderBtn">
+                            <i class="bi bi-folder2-open me-1"></i>Copy Path
+                        </button>
+                        <button type="button" class="btn btn-primary flex-grow-1" id="generateAnotherBtn">
+                            <i class="bi bi-plus-circle me-1"></i>Generate Another
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Error State -->
+                <div id="statusError" class="d-none">
+                    <div class="alert alert-danger">
+                        <i class="bi bi-x-circle-fill me-2"></i>
+                        <strong>Generation Failed</strong>
+                    </div>
+                    <div class="bg-light p-3 rounded mb-4">
+                        <pre class="mb-0 text-danger" id="errorMessage" style="white-space: pre-wrap;"></pre>
+                    </div>
+                    <button type="button" class="btn btn-primary w-100" id="retryBtn">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Try Again
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Videos -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Recent Videos</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_videos %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Created</th>
+                                <th>Problem</th>
+                                <th>Output Folder</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for video in recent_videos %}
+                            <tr>
+                                <td>{{ video.created_at }}</td>
+                                <td class="text-truncate" style="max-width: 300px;">{{ video.problem[:100] }}...</td>
+                                <td class="output-info">{{ video.output_folder }}</td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if video.status == 'completed' else 'warning' }}">
+                                        {{ video.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-film fs-1"></i>
+                    <p class="mt-2">No videos generated yet. Create your first one above!</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Color picker sync
+const colorPicker = document.getElementById('backgroundColor');
+const colorHex = document.getElementById('backgroundColorHex');
+
+colorPicker.addEventListener('input', function() {
+    colorHex.value = this.value.toUpperCase();
+});
+
+// Color presets
+document.querySelectorAll('[data-color]').forEach(item => {
+    item.addEventListener('click', function(e) {
+        e.preventDefault();
+        const color = this.getAttribute('data-color');
+        colorPicker.value = color;
+        colorHex.value = color.toUpperCase();
+    });
+});
+
+// API type change - show/hide quality option
+document.getElementById('apiType').addEventListener('change', function() {
+    const qualitySection = document.getElementById('qualitySection');
+    if (this.value === 'prism') {
+        qualitySection.style.display = 'block';
+    } else {
+        qualitySection.style.display = 'none';
+    }
+});
+
+// Form submission
+document.getElementById('videoGenerateForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const form = this;
+    const generateBtn = document.getElementById('generateBtn');
+    
+    // Get form data
+    const formData = {
+        problem_statement: document.getElementById('problemStatement').value,
+        background_color: document.getElementById('backgroundColor').value,
+        api_type: document.getElementById('apiType').value,
+        video_quality: document.getElementById('videoQuality').value,
+        output_dir: document.getElementById('outputDir').value
+    };
+    
+    // Validate
+    if (!formData.problem_statement.trim()) {
+        alert('Please enter a problem statement');
+        return;
+    }
+    
+    // Show running state
+    document.getElementById('statusIdle').classList.add('d-none');
+    document.getElementById('statusRunning').classList.remove('d-none');
+    document.getElementById('statusCompleted').classList.add('d-none');
+    document.getElementById('statusError').classList.add('d-none');
+    
+    // Disable form
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
+    
+    // Start progress animation
+    // Phase 1: 0-90% over 2 minutes (120 seconds)
+    // Phase 2: 90-99% at 1% per 6 seconds (54 seconds total)
+    let progress = 0;
+    const phase1Target = 90;
+    const phase1Duration = 120000; // 2 minutes in milliseconds
+    const phase2Target = 99;
+    const phase2Increment = 1; // 1% per step
+    const phase2StepDuration = 6000; // 6 seconds per 1%
+    const interval = 100; // Update every 100ms
+    const phase1Increment = (phase1Target / phase1Duration) * interval;
+    
+    const progressInterval = setInterval(() => {
+        if (progress < phase1Target) {
+            // Phase 1: Fast progress to 90%
+            progress += phase1Increment;
+            updateCircularProgress(Math.min(progress, phase1Target));
+        } else if (progress < phase2Target) {
+            // Phase 2: Slow progress from 90% to 99% (1% per 6 seconds)
+            // Check if 6 seconds have passed since last increment
+            if (!this.lastPhase2Update) {
+                this.lastPhase2Update = Date.now();
+            }
+            const timeSinceLastUpdate = Date.now() - this.lastPhase2Update;
+            if (timeSinceLastUpdate >= phase2StepDuration) {
+                progress = Math.min(progress + phase2Increment, phase2Target);
+                updateCircularProgress(progress);
+                this.lastPhase2Update = Date.now();
+            }
+        }
+        // If progress >= 99%, wait for video completion
+    }, interval);
+    
+    try {
+        const response = await fetch('/api/video/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        // Stop the progress interval
+        clearInterval(progressInterval);
+        
+        if (result.success) {
+            // Complete progress to 100%
+            updateCircularProgress(100);
+            
+            // Wait a moment to show 100%
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Show success
+            document.getElementById('statusRunning').classList.add('d-none');
+            document.getElementById('statusCompleted').classList.remove('d-none');
+            
+            // Populate output info (just the path)
+            document.getElementById('outputVideoPath').textContent = result.processed_video || 'N/A';
+            
+            // Store output folder for "Copy Path" button
+            document.getElementById('openFolderBtn').setAttribute('data-folder', result.processed_video || '');
+            
+        } else {
+            throw new Error(result.error || 'Unknown error occurred');
+        }
+        
+    } catch (error) {
+        console.error('Generation error:', error);
+        
+        // Stop the progress interval
+        clearInterval(progressInterval);
+        
+        // Show error state
+        document.getElementById('statusRunning').classList.add('d-none');
+        document.getElementById('statusError').classList.remove('d-none');
+        document.getElementById('errorMessage').textContent = error.message;
+        
+    } finally {
+        // Re-enable form
+        generateBtn.disabled = false;
+        generateBtn.innerHTML = '<i class="bi bi-play-circle me-2"></i>Generate Video';
+    }
+});
+
+// Update circular progress bar
+function updateCircularProgress(percent) {
+    const circle = document.getElementById('progressCircle');
+    const percentText = document.getElementById('progressPercent');
+    
+    // Circle circumference = 2 * PI * radius = 2 * 3.14159 * 50 = 314
+    const circumference = 314;
+    const offset = circumference - (percent / 100 * circumference);
+    
+    circle.style.strokeDashoffset = offset;
+    percentText.textContent = Math.round(percent) + '%';
+}
+
+// Generate another button
+document.getElementById('generateAnotherBtn').addEventListener('click', function() {
+    document.getElementById('statusCompleted').classList.add('d-none');
+    document.getElementById('statusIdle').classList.remove('d-none');
+    document.getElementById('problemStatement').value = '';
+    document.getElementById('problemStatement').focus();
+    updateCircularProgress(0); // Reset progress
+});
+
+// Retry button
+document.getElementById('retryBtn').addEventListener('click', function() {
+    document.getElementById('statusError').classList.add('d-none');
+    document.getElementById('statusIdle').classList.remove('d-none');
+    updateCircularProgress(0); // Reset progress
+});
+
+// Copy path button
+document.getElementById('openFolderBtn').addEventListener('click', function() {
+    const path = this.getAttribute('data-folder');
+    if (path) {
+        navigator.clipboard.writeText(path).then(() => {
+            // Change button text temporarily
+            const originalText = this.innerHTML;
+            this.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
+            this.classList.remove('btn-outline-primary');
+            this.classList.add('btn-success');
+            
+            setTimeout(() => {
+                this.innerHTML = originalText;
+                this.classList.remove('btn-success');
+                this.classList.add('btn-outline-primary');
+            }, 2000);
+        });
+    }
+});
+</script>
+{% endblock %}

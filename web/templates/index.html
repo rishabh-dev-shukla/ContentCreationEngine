@@ -14,7 +14,7 @@
 
 <!-- Stats Cards -->
 <div class="row mb-4">
-    <div class="col-md-3 col-sm-6 mb-3">
+    <div class="col-lg col-md-4 col-sm-6 mb-3">
         <div class="card bg-primary text-white h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
@@ -32,7 +32,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-sm-6 mb-3">
+    <div class="col-lg col-md-4 col-sm-6 mb-3">
         <div class="card bg-success text-white h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
@@ -50,7 +50,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-sm-6 mb-3">
+    <div class="col-lg col-md-4 col-sm-6 mb-3">
         <div class="card bg-info text-white h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
@@ -62,13 +62,13 @@
                 </div>
             </div>
             <div class="card-footer bg-transparent border-0">
-                <a href="{{ url_for('scripts_page', persona_id=personas[0] if personas else 'default') }}" class="text-white text-decoration-none small">
+                <a href="{{ url_for('scripts_page') }}" class="text-white text-decoration-none small">
                     View scripts <i class="bi bi-arrow-right"></i>
                 </a>
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-sm-6 mb-3">
+    <div class="col-lg col-md-4 col-sm-6 mb-3">
         <div class="card bg-warning text-dark h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
@@ -82,6 +82,24 @@
             <div class="card-footer bg-transparent border-0">
                 <a href="{{ url_for('research_page') }}" class="text-dark text-decoration-none small">
                     View research <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg col-md-4 col-sm-6 mb-3">
+        <div class="card bg-secondary text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">Insights</h6>
+                        <h2 class="mt-2 mb-0">{{ insights_count }}</h2>
+                    </div>
+                    <i class="bi bi-graph-up fs-1 opacity-50"></i>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                <a href="{{ url_for('insights_page') }}" class="text-white text-decoration-none small">
+                    View insights <i class="bi bi-arrow-right"></i>
                 </a>
             </div>
         </div>
@@ -118,6 +136,11 @@
                     <div class="col-md-4">
                         <a href="{{ url_for('generate_page') }}" class="btn btn-outline-primary w-100">
                             <i class="bi bi-sliders me-1"></i> Advanced Generation
+                        </a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="{{ url_for('video_generator_page') }}" class="btn btn-outline-info w-100">
+                            <i class="bi bi-camera-video me-1"></i> Video Generator
                         </a>
                     </div>
                 </div>

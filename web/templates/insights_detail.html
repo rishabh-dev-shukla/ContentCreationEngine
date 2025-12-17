@@ -1,0 +1,573 @@
+{% extends "base.html" %}
+
+{% block title %}Insights Detail - ContentCreationEngine{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('insights_page') }}">Insights</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('insights_page') }}">{{ persona_id }}</a></li>
+                <li class="breadcrumb-item active">{{ insights.generated_at[:10] if insights.generated_at else 'Report' }}</li>
+            </ol>
+        </nav>
+        <h1>
+            <i class="bi bi-graph-up text-success me-2"></i>
+            Insights Report
+        </h1>
+        <p class="text-muted">
+            <span class="badge bg-primary me-2">{{ insights.persona_id }}</span>
+            <span class="badge bg-secondary me-2">{{ insights.niche }}</span>
+            Generated: {{ insights.generated_at[:19] if insights.generated_at else 'Unknown' }}
+        </p>
+    </div>
+</div>
+
+<!-- Executive Summary -->
+{% if insights.executive_summary %}
+<div class="card mb-4 border-success">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Executive Summary</h5>
+    </div>
+    <div class="card-body">
+        <div class="executive-summary" style="white-space: pre-line;">{{ insights.executive_summary }}</div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Data Sources -->
+{% if insights.data_sources_analyzed %}
+<div class="row mb-4">
+    {% for source, count in insights.data_sources_analyzed.items() %}
+    <div class="col-md-2 col-4 mb-2">
+        <div class="card text-center">
+            <div class="card-body py-2">
+                <h4 class="mb-0">{{ count }}</h4>
+                <small class="text-muted">{{ source|capitalize }}</small>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Analysis Tabs -->
+<ul class="nav nav-tabs mb-4" id="analysisTabs" role="tablist">
+    {% set analysis_icons = {
+        'trending_topics': 'bi-fire',
+        'audience_pain_points': 'bi-exclamation-triangle',
+        'content_gaps': 'bi-puzzle',
+        'competitor_analysis': 'bi-people',
+        'engagement_patterns': 'bi-heart',
+        'keyword_opportunities': 'bi-search',
+        'strategic_recommendations': 'bi-compass'
+    } %}
+    {% set analysis_names = {
+        'trending_topics': 'Trends',
+        'audience_pain_points': 'Pain Points',
+        'content_gaps': 'Content Gaps',
+        'competitor_analysis': 'Competitors',
+        'engagement_patterns': 'Engagement',
+        'keyword_opportunities': 'Keywords',
+        'strategic_recommendations': 'Strategy'
+    } %}
+    {% for analysis_type, data in insights.analyses.items() %}
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if loop.first %}active{% endif %}" 
+                id="tab-{{ analysis_type }}" 
+                data-bs-toggle="tab" 
+                data-bs-target="#pane-{{ analysis_type }}" 
+                type="button">
+            <i class="bi {{ analysis_icons.get(analysis_type, 'bi-clipboard-data') }} me-1"></i>
+            {{ analysis_names.get(analysis_type, analysis_type|replace('_', ' ')|title) }}
+        </button>
+    </li>
+    {% endfor %}
+</ul>
+
+<div class="tab-content" id="analysisTabContent">
+    {% for analysis_type, data in insights.analyses.items() %}
+    <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+         id="pane-{{ analysis_type }}" 
+         role="tabpanel">
+        
+        {% if data.error %}
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Error in analysis: {{ data.error }}
+        </div>
+        {% else %}
+        
+        <!-- Trending Topics -->
+        {% if analysis_type == 'trending_topics' %}
+        <div class="row">
+            <div class="col-lg-8">
+                <h5><i class="bi bi-fire text-danger me-2"></i>Top Trends</h5>
+                {% if data.top_trends %}
+                {% for trend in data.top_trends %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h6 class="card-title mb-1">{{ trend.topic }}</h6>
+                            <span class="badge bg-{{ 'danger' if trend.trend_strength == 'high' else 'warning' if trend.trend_strength == 'medium' else 'secondary' }}">
+                                {{ trend.trend_strength|upper }}
+                            </span>
+                        </div>
+                        <p class="card-text small text-muted mb-2">{{ trend.evidence }}</p>
+                        <p class="card-text"><strong>Content Angle:</strong> {{ trend.content_angle }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+            <div class="col-lg-4">
+                {% if data.emerging_trends %}
+                <div class="card mb-3 border-success">
+                    <div class="card-header bg-success text-white">
+                        <i class="bi bi-arrow-up-right me-1"></i>Emerging
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        {% for item in data.emerging_trends %}
+                        <li class="list-group-item">{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if data.declining_trends %}
+                <div class="card mb-3 border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <i class="bi bi-arrow-down-right me-1"></i>Declining
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        {% for item in data.declining_trends %}
+                        <li class="list-group-item">{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if data.seasonal_relevance %}
+                <div class="alert alert-info">
+                    <i class="bi bi-calendar me-2"></i>
+                    <strong>Seasonal:</strong> {{ data.seasonal_relevance }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Pain Points -->
+        {% elif analysis_type == 'audience_pain_points' %}
+        <div class="row">
+            <div class="col-lg-8">
+                <h5><i class="bi bi-exclamation-triangle text-warning me-2"></i>Major Pain Points</h5>
+                {% if data.major_pain_points %}
+                {% for point in data.major_pain_points %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h6 class="card-title mb-1">{{ point.pain_point }}</h6>
+                            <span class="badge bg-{{ 'danger' if point.severity == 'high' else 'warning' if point.severity == 'medium' else 'secondary' }}">
+                                {{ point.severity|upper }}
+                            </span>
+                        </div>
+                        <p class="card-text small text-muted mb-2"><i class="bi bi-geo-alt me-1"></i>{{ point.evidence }}</p>
+                        <p class="card-text"><strong>Content Opportunity:</strong> {{ point.content_opportunity }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+            <div class="col-lg-4">
+                {% if data.common_questions %}
+                <div class="card mb-3">
+                    <div class="card-header"><i class="bi bi-question-circle me-1"></i>Common Questions</div>
+                    <ul class="list-group list-group-flush">
+                        {% for q in data.common_questions %}
+                        <li class="list-group-item small">{{ q }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if data.misconceptions %}
+                <div class="card mb-3">
+                    <div class="card-header"><i class="bi bi-x-circle me-1"></i>Misconceptions</div>
+                    <ul class="list-group list-group-flush">
+                        {% for m in data.misconceptions %}
+                        <li class="list-group-item small">{{ m }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if data.emotional_triggers %}
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-heart me-1"></i>Emotional Triggers</div>
+                    <ul class="list-group list-group-flush">
+                        {% for t in data.emotional_triggers %}
+                        <li class="list-group-item small">{{ t }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Content Gaps -->
+        {% elif analysis_type == 'content_gaps' %}
+        <div class="row">
+            <div class="col-lg-8">
+                <h5><i class="bi bi-puzzle text-primary me-2"></i>Content Gaps</h5>
+                {% if data.content_gaps %}
+                {% for gap in data.content_gaps %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h6 class="card-title mb-1">{{ gap.gap }}</h6>
+                            <span class="badge bg-{{ 'success' if gap.opportunity_size == 'high' else 'warning' if gap.opportunity_size == 'medium' else 'secondary' }}">
+                                {{ gap.opportunity_size|upper }} opportunity
+                            </span>
+                        </div>
+                        <p class="card-text small text-muted mb-2">{{ gap.why_underserved }}</p>
+                        <p class="card-text"><strong>Suggested Content:</strong> {{ gap.suggested_content }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+            <div class="col-lg-4">
+                {% if data.oversaturated_topics %}
+                <div class="card mb-3 border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <i class="bi bi-exclamation-triangle me-1"></i>Oversaturated
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        {% for item in data.oversaturated_topics %}
+                        <li class="list-group-item small">{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if data.unique_angles %}
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <i class="bi bi-lightbulb me-1"></i>Unique Angles
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        {% for item in data.unique_angles %}
+                        <li class="list-group-item small">{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Competitor Analysis -->
+        {% elif analysis_type == 'competitor_analysis' %}
+        <div class="row">
+            <div class="col-lg-8">
+                <h5><i class="bi bi-people text-info me-2"></i>Top Performers</h5>
+                {% if data.top_performers %}
+                {% for performer in data.top_performers %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ performer.name }}</h6>
+                        <p class="card-text"><strong>What Works:</strong> {{ performer.what_works }}</p>
+                        <p class="card-text small"><strong>Style:</strong> {{ performer.content_style }}</p>
+                        <div class="alert alert-info mb-0 py-2">
+                            <i class="bi bi-lightbulb me-1"></i><strong>Learning:</strong> {{ performer.learnings }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+            <div class="col-lg-4">
+                {% if data.common_formats %}
+                <div class="card mb-3">
+                    <div class="card-header"><i class="bi bi-grid me-1"></i>Popular Formats</div>
+                    <ul class="list-group list-group-flush">
+                        {% for f in data.common_formats %}
+                        <li class="list-group-item small">{{ f }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if data.differentiation_opportunities %}
+                <div class="card mb-3 border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <i class="bi bi-star me-1"></i>Differentiate
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        {% for d in data.differentiation_opportunities %}
+                        <li class="list-group-item small">{{ d }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if data.best_practices %}
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-check-circle me-1"></i>Best Practices</div>
+                    <ul class="list-group list-group-flush">
+                        {% for bp in data.best_practices %}
+                        <li class="list-group-item small">{{ bp }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Engagement Patterns -->
+        {% elif analysis_type == 'engagement_patterns' %}
+        <div class="row">
+            <div class="col-lg-8">
+                <h5><i class="bi bi-heart text-danger me-2"></i>High Engagement Patterns</h5>
+                {% if data.high_engagement_patterns %}
+                {% for pattern in data.high_engagement_patterns %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ pattern.pattern }}</h6>
+                        <span class="badge bg-info mb-2">{{ pattern.engagement_type }}</span>
+                        <p class="card-text small text-muted">{{ pattern.examples }}</p>
+                        <p class="card-text"><strong>How to Apply:</strong> {{ pattern.application }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+            <div class="col-lg-4">
+                {% if data.optimal_content_length %}
+                <div class="alert alert-info">
+                    <i class="bi bi-clock me-2"></i>
+                    <strong>Optimal Length:</strong> {{ data.optimal_content_length }}
+                </div>
+                {% endif %}
+                {% if data.hook_styles %}
+                <div class="card mb-3">
+                    <div class="card-header"><i class="bi bi-megaphone me-1"></i>Effective Hooks</div>
+                    <ul class="list-group list-group-flush">
+                        {% for h in data.hook_styles %}
+                        <li class="list-group-item small">{{ h }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if data.cta_patterns %}
+                <div class="card mb-3">
+                    <div class="card-header"><i class="bi bi-hand-index me-1"></i>CTA Patterns</div>
+                    <ul class="list-group list-group-flush">
+                        {% for cta in data.cta_patterns %}
+                        <li class="list-group-item small">{{ cta }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if data.posting_insights %}
+                <div class="alert alert-secondary">
+                    <i class="bi bi-calendar-check me-2"></i>
+                    {{ data.posting_insights }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Keyword Opportunities -->
+        {% elif analysis_type == 'keyword_opportunities' %}
+        <div class="row">
+            <div class="col-lg-8">
+                <h5><i class="bi bi-search text-primary me-2"></i>High Value Keywords</h5>
+                {% if data.high_value_keywords %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Keyword</th>
+                                <th>Intent</th>
+                                <th>Competition</th>
+                                <th>Recommendation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for kw in data.high_value_keywords %}
+                            <tr>
+                                <td><strong>{{ kw.keyword }}</strong></td>
+                                <td><span class="badge bg-secondary">{{ kw.search_intent }}</span></td>
+                                <td>
+                                    <span class="badge bg-{{ 'danger' if kw.competition == 'high' else 'warning' if kw.competition == 'medium' else 'success' }}">
+                                        {{ kw.competition }}
+                                    </span>
+                                </td>
+                                <td class="small">{{ kw.content_recommendation }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+                
+                {% if data.geo_optimization %}
+                <div class="card mt-4 border-info">
+                    <div class="card-header bg-info text-white">
+                        <i class="bi bi-robot me-1"></i>GEO (Generative Engine Optimization)
+                    </div>
+                    <div class="card-body">
+                        {% if data.geo_optimization.ai_friendly_topics %}
+                        <p><strong>AI-Friendly Topics:</strong> {{ data.geo_optimization.ai_friendly_topics }}</p>
+                        {% endif %}
+                        {% if data.geo_optimization.citation_opportunities %}
+                        <p><strong>Citation Opportunities:</strong> {{ data.geo_optimization.citation_opportunities }}</p>
+                        {% endif %}
+                        {% if data.geo_optimization.structured_data_suggestions %}
+                        <p class="mb-0"><strong>Structured Data:</strong> {{ data.geo_optimization.structured_data_suggestions }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="col-lg-4">
+                {% if data.long_tail_opportunities %}
+                <div class="card mb-3">
+                    <div class="card-header"><i class="bi bi-list me-1"></i>Long-Tail Keywords</div>
+                    <ul class="list-group list-group-flush">
+                        {% for lt in data.long_tail_opportunities %}
+                        <li class="list-group-item small">{{ lt }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if data.question_keywords %}
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-question-circle me-1"></i>Question Keywords</div>
+                    <ul class="list-group list-group-flush">
+                        {% for q in data.question_keywords %}
+                        <li class="list-group-item small">{{ q }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Strategic Recommendations -->
+        {% elif analysis_type == 'strategic_recommendations' %}
+        {% if data.content_strategy %}
+        <div class="card mb-4 border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-compass me-2"></i>Content Strategy</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Primary Focus:</strong> {{ data.content_strategy.primary_focus }}</p>
+                        <p><strong>Differentiation:</strong> {{ data.content_strategy.differentiation }}</p>
+                        <p><strong>Content Mix:</strong> {{ data.content_strategy.content_mix }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Content Pillars:</strong>
+                        <ul>
+                            {% for pillar in data.content_strategy.content_pillars %}
+                            <li>{{ pillar }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="row">
+            <div class="col-lg-8">
+                <h5><i class="bi bi-rocket text-success me-2"></i>Growth Opportunities</h5>
+                {% if data.growth_opportunities %}
+                {% for opp in data.growth_opportunities %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="card-title mb-0">{{ opp.opportunity }}</h6>
+                            <div>
+                                <span class="badge bg-{{ 'success' if opp.potential_impact == 'high' else 'warning' if opp.potential_impact == 'medium' else 'secondary' }} me-1">
+                                    {{ opp.potential_impact }} impact
+                                </span>
+                                <span class="badge bg-{{ 'danger' if opp.effort_required == 'high' else 'warning' if opp.effort_required == 'medium' else 'success' }}">
+                                    {{ opp.effort_required }} effort
+                                </span>
+                            </div>
+                        </div>
+                        <p class="small text-muted mb-2"><i class="bi bi-clock me-1"></i>{{ opp.timeline }} term</p>
+                        {% if opp.action_steps %}
+                        <strong>Action Steps:</strong>
+                        <ol class="mb-0 small">
+                            {% for step in opp.action_steps %}
+                            <li>{{ step }}</li>
+                            {% endfor %}
+                        </ol>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+            <div class="col-lg-4">
+                {% if data.quick_wins %}
+                <div class="card mb-3 border-success">
+                    <div class="card-header bg-success text-white">
+                        <i class="bi bi-lightning me-1"></i>Quick Wins
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        {% for qw in data.quick_wins %}
+                        <li class="list-group-item small">{{ qw }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if data.long_term_plays %}
+                <div class="card mb-3 border-info">
+                    <div class="card-header bg-info text-white">
+                        <i class="bi bi-calendar-range me-1"></i>Long-Term Plays
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        {% for ltp in data.long_term_plays %}
+                        <li class="list-group-item small">{{ ltp }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if data.risks_to_avoid %}
+                <div class="card border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <i class="bi bi-shield-exclamation me-1"></i>Risks to Avoid
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        {% for risk in data.risks_to_avoid %}
+                        <li class="list-group-item small">{{ risk }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% else %}
+        <!-- Generic display for unknown analysis types -->
+        <pre class="bg-light p-3 rounded" style="max-height: 500px; overflow: auto;">{{ data|tojson(indent=2) }}</pre>
+        {% endif %}
+        
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Raw JSON (collapsible) -->
+<div class="card mt-4">
+    <div class="card-header">
+        <a class="text-decoration-none" data-bs-toggle="collapse" href="#rawJson">
+            <i class="bi bi-code me-2"></i>View Raw JSON
+        </a>
+    </div>
+    <div id="rawJson" class="collapse">
+        <div class="card-body">
+            <pre class="bg-light p-3 rounded" style="max-height: 400px; overflow: auto;">{{ insights|tojson(indent=2) }}</pre>
+        </div>
+    </div>
+</div>
+{% endblock %}
