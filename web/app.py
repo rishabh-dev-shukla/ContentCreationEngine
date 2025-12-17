@@ -145,11 +145,20 @@ def get_all_research_data() -> list:
             try:
                 research_list = firebase.list_research(customer_id=customer_id, limit=50)
                 # Transform to match the expected format
-                return [{
-                    'date': r.get('date', ''),
-                    'filename': f"{r.get('date', 'unknown')}_research.json",
-                    'data': r.get('data', {})
-                } for r in research_list]
+                # Firebase research docs have the data at root level, not nested under 'data'
+                result = []
+                for r in research_list:
+                    doc_id = r.get('_id', '')
+                    # Extract date from doc_id (e.g., "2025-12-14_research" -> "2025-12-14")
+                    date = doc_id.replace('_research', '') if doc_id else r.get('saved_at', '')[:10]
+                    # The research data is at root level, minus metadata fields
+                    data = {k: v for k, v in r.items() if not k.startswith('_') and k not in ['saved_at', 'migrated_from', 'migrated_at']}
+                    result.append({
+                        'date': date,
+                        'filename': f"{date}_research.json",
+                        'data': data
+                    })
+                return result
             except Exception as e:
                 logger.error(f"Error getting research from Firebase: {e}")
                 return []
@@ -188,6 +197,11 @@ def get_all_insights(persona_id: str = None) -> list:
                     persona_id=persona_id,
                     limit=50
                 )
+                # Transform to match expected format
+                for insight in insights_list:
+                    # Add _filename for compatibility with templates
+                    if '_id' in insight and '_filename' not in insight:
+                        insight['_filename'] = f"{insight['_id']}.json"
                 return insights_list
             except Exception as e:
                 logger.error(f"Error getting insights from Firebase: {e}")
