@@ -90,6 +90,25 @@ def get_persona_manager(customer_id: str = None):
 
 def get_all_content_outputs(persona_id: str = None) -> list:
     """Get all generated content outputs, optionally filtered by persona."""
+    customer_id = get_current_customer_id()
+    
+    # If we have a customer context, use Firebase
+    if customer_id:
+        from src.content_creation_engine.utils.firebase_service import get_firebase_service
+        firebase = get_firebase_service()
+        if firebase:
+            try:
+                outputs = firebase.list_content_outputs(
+                    customer_id=customer_id,
+                    persona_id=persona_id,
+                    limit=100
+                )
+                return outputs
+            except Exception as e:
+                logger.error(f"Error getting content from Firebase: {e}")
+                return []
+    
+    # Fallback to local files
     outputs = []
     output_dir = settings.output_dir
     
@@ -116,6 +135,26 @@ def get_all_content_outputs(persona_id: str = None) -> list:
 
 def get_all_research_data() -> list:
     """Get all research data from cache."""
+    customer_id = get_current_customer_id()
+    
+    # If we have a customer context, use Firebase
+    if customer_id:
+        from src.content_creation_engine.utils.firebase_service import get_firebase_service
+        firebase = get_firebase_service()
+        if firebase:
+            try:
+                research_list = firebase.list_research(customer_id=customer_id, limit=50)
+                # Transform to match the expected format
+                return [{
+                    'date': r.get('date', ''),
+                    'filename': f"{r.get('date', 'unknown')}_research.json",
+                    'data': r.get('data', {})
+                } for r in research_list]
+            except Exception as e:
+                logger.error(f"Error getting research from Firebase: {e}")
+                return []
+    
+    # Fallback to local files
     research_data = []
     cache_dir = settings.research_cache_dir
     
@@ -132,6 +171,31 @@ def get_all_research_data() -> list:
             logger.error(f"Error loading research {file_path}: {e}")
     
     return research_data
+
+
+def get_all_insights(persona_id: str = None) -> list:
+    """Get all insights, optionally filtered by persona."""
+    customer_id = get_current_customer_id()
+    
+    # If we have a customer context, use Firebase
+    if customer_id:
+        from src.content_creation_engine.utils.firebase_service import get_firebase_service
+        firebase = get_firebase_service()
+        if firebase:
+            try:
+                insights_list = firebase.list_insights(
+                    customer_id=customer_id,
+                    persona_id=persona_id,
+                    limit=50
+                )
+                return insights_list
+            except Exception as e:
+                logger.error(f"Error getting insights from Firebase: {e}")
+                return []
+    
+    # Fallback to local InsightsAnalyzer
+    analyzer = InsightsAnalyzer()
+    return analyzer.list_insights(persona_id)
 
 
 # =============================================================================
@@ -227,8 +291,7 @@ def index():
     research_data = get_all_research_data()
     
     # Get insights count
-    analyzer = InsightsAnalyzer()
-    all_insights = analyzer.list_insights()
+    all_insights = get_all_insights()
     
     return render_template('index.html',
                           personas=personas,
@@ -398,8 +461,7 @@ def insights_page():
     personas = manager.list_personas()
     
     # Get all insights
-    analyzer = InsightsAnalyzer()
-    all_insights = analyzer.list_insights()
+    all_insights = get_all_insights()
     
     # Get all research runs with metadata
     research_runs = []
@@ -825,8 +887,7 @@ def api_insights_status(job_id):
 def api_list_insights():
     """API: List all insights."""
     persona_id = request.args.get('persona_id')
-    analyzer = InsightsAnalyzer()
-    insights_list = analyzer.list_insights(persona_id)
+    insights_list = get_all_insights(persona_id)
     
     # Simplify for API response
     simplified = []
