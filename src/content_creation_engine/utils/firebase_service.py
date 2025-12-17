@@ -667,6 +667,41 @@ class FirebaseService:
             logger.error(f"Error saving insights: {e}")
             raise
     
+    def get_insights(
+        self, 
+        customer_id: str, 
+        persona_id: str,
+        insights_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific insights document.
+        
+        Args:
+            customer_id: Customer document ID
+            persona_id: Persona document ID
+            insights_id: Insights document ID
+            
+        Returns:
+            Insights document data or None if not found
+        """
+        try:
+            doc = (self.db.collection('customers')
+                   .document(customer_id)
+                   .collection('personas')
+                   .document(persona_id)
+                   .collection('insights')
+                   .document(insights_id)
+                   .get())
+            
+            if doc.exists:
+                data = doc.to_dict()
+                data['_id'] = doc.id
+                return data
+            return None
+        except Exception as e:
+            logger.error(f"Error getting insights: {e}")
+            return None
+    
     def list_insights(
         self, 
         customer_id: str, 

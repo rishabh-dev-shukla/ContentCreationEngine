@@ -500,6 +500,26 @@ def insights_page():
 @login_required
 def view_insights_detail(persona_id, filename):
     """View detailed insights."""
+    customer_id = get_current_customer_id()
+    
+    # Try Firebase first if we have a customer context
+    if customer_id:
+        from src.content_creation_engine.utils.firebase_service import get_firebase_service
+        firebase = get_firebase_service()
+        if firebase:
+            try:
+                # Extract insights_id from filename (remove .json extension)
+                insights_id = filename.replace('.json', '')
+                insights = firebase.get_insights(customer_id, persona_id, insights_id)
+                if insights:
+                    return render_template('insights_detail.html',
+                                          insights=insights,
+                                          persona_id=persona_id,
+                                          filename=filename)
+            except Exception as e:
+                logger.error(f"Error loading insights from Firebase: {e}")
+    
+    # Fallback to local file
     insights_dir = settings.output_dir / "insights" / persona_id
     file_path = insights_dir / filename
     
