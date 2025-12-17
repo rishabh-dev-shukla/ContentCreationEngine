@@ -63,6 +63,24 @@
                     </li>
                 </ul>
                 <ul class="navbar-nav">
+                    {% if current_user %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="customerDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-building me-1"></i>
+                            <span>{{ current_customer_id or 'Select Customer' }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            {% for customer in user_customers %}
+                            <li>
+                                <a class="dropdown-item {% if customer._id == current_customer_id %}active{% endif %}" 
+                                   href="{{ url_for('switch_customer', customer_id=customer._id) }}">
+                                    {{ customer.name or customer._id }}
+                                </a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'settings_page' %}active{% endif %}" href="{{ url_for('settings_page') }}">
                             <i class="bi bi-gear me-1"></i> Settings
@@ -73,6 +91,23 @@
                             <i class="bi bi-moon-stars"></i>
                         </button>
                     </li>
+                    {% if current_user %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            {% if current_user.picture %}
+                            <img src="{{ current_user.picture }}" alt="" class="rounded-circle me-2" style="width: 24px; height: 24px;">
+                            {% else %}
+                            <i class="bi bi-person-circle me-2"></i>
+                            {% endif %}
+                            <span>{{ current_user.name or current_user.email }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><span class="dropdown-item-text text-muted small">{{ current_user.email }}</span></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
