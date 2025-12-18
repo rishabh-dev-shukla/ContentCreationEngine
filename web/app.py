@@ -1192,13 +1192,17 @@ def _generate_video_background(job_id, problem_statement, background_color, api_
         video_jobs[job_id]['progress'] = 10
         logger.info(f"Generating video for problem: {problem_statement[:50]}...")
         
-        result = generate_math_ai_video(
-            math_problem=problem_statement,
-            api_type=api_type,
-            background_color=background_color,
-            quality=video_quality,
-            remove_watermark=False  # We'll process manually
-        )
+        try:
+            result = generate_math_ai_video(
+                math_problem=problem_statement,
+                api_type=api_type,
+                background_color=background_color,
+                quality=video_quality,
+                remove_watermark=False  # We'll process manually
+            )
+        except Exception as knolify_error:
+            logger.error(f"Knolify API error: {knolify_error}")
+            raise Exception(f"Knolify API failed: {str(knolify_error)}")
         
         video_url = result.get('video_link')
         if not video_url:
@@ -1261,11 +1265,37 @@ def _generate_video_background(job_id, problem_statement, background_color, api_
         }
         
     except Exception as e:
-        logger.error(f"Video generation error: {e}")
+        logger.error(f"Video generation error for job {job_id}: {e}")
         import traceback
-        traceback.print_exc()
-        video_jobs[job_id]['status'] = 'failed'
-        video_jobs[job_id]['message'] = f'Error: {str(e)}'
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        
+        # Defensive update - check if job still exists
+        try:
+            if job_id in video_jobs:
+                video_jobs[job_id]['status'] = 'failed'
+                video_jobs[job_id]['progress'] = 0
+                video_jobs[job_id]['message'] = f'Error: {str(e)}'
+                logger.info(f"Updated job {job_id} to failed status")
+            else:
+                # Job disappeared! Recreate it with error status
+                logger.error(f"Job {job_id} disappeared from video_jobs! Recreating with error status")
+                video_jobs[job_id] = {
+                    'status': 'failed',
+                    'progress': 0,
+                    'message': f'Error: {str(e)}',
+                    'started_at': datetime.now().isoformat()
+                }
+        except Exception as update_error:
+            logger.error(f"Failed to update job status: {update_error}")
+    
+    finally:
+        # Ensure job exists with final status
+        logger.info(f"Background thread finishing for job {job_id}")
+        logger.info(f"Final video_jobs state: {list(video_jobs.keys())}")
+        if job_id in video_jobs:
+            logger.info(f"Job {job_id} final status: {video_jobs[job_id].get('status')}")
+        else:
+            logger.error(f"Job {job_id} missing from video_jobs at thread end!")
 
 
 @app.route('/api/video/generate', methods=['POST'])
