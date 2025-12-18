@@ -183,16 +183,29 @@ Or: Explain how to find the derivative of f(x) = x² + 3x + 2"></textarea>
                     </div>
                     
                     <div class="mb-4">
-                        <h6><i class="bi bi-folder me-2"></i>Output Location</h6>
+                        <h6><i class="bi bi-link-45deg me-2"></i>Download Links</h6>
                         <div class="bg-light p-3 rounded">
-                            <code id="outputVideoPath" class="text-break" style="font-size: 0.9rem;"></code>
+                            <div class="mb-2">
+                                <strong>Processed Video:</strong><br>
+                                <a href="#" id="downloadLink" class="btn btn-sm btn-success mt-1">
+                                    <i class="bi bi-download me-1"></i>Download Video
+                                </a>
+                            </div>
+                            <div class="mb-2" id="originalUrlSection">
+                                <strong>Original (Knolify Hosted):</strong><br>
+                                <a href="#" id="originalVideoUrl" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
+                                    <i class="bi bi-box-arrow-up-right me-1"></i>View Original
+                                </a>
+                            </div>
+                            <div id="subtitlesSection" class="d-none">
+                                <strong>Subtitles:</strong><br>
+                                <a href="#" id="vttLink" target="_blank" class="btn btn-sm btn-outline-secondary mt-1 me-1">VTT</a>
+                                <a href="#" id="srtLink" target="_blank" class="btn btn-sm btn-outline-secondary mt-1">SRT</a>
+                            </div>
                         </div>
                     </div>
                     
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-primary flex-grow-1" id="openFolderBtn">
-                            <i class="bi bi-folder2-open me-1"></i>Copy Path
-                        </button>
                         <button type="button" class="btn btn-primary flex-grow-1" id="generateAnotherBtn">
                             <i class="bi bi-plus-circle me-1"></i>Generate Another
                         </button>
@@ -438,11 +451,33 @@ async function pollVideoStatus(jobId, progressInterval) {
                 document.getElementById('statusRunning').classList.add('d-none');
                 document.getElementById('statusCompleted').classList.remove('d-none');
                 
-                // Populate output info
+                // Populate download links
                 if (status.result) {
-                    document.getElementById('outputVideoPath').textContent = status.result.processed_video || 'N/A';
-                    document.getElementById('openFolderBtn').setAttribute('data-folder', status.result.processed_video || '');
+                    // Download link for processed video
+                    document.getElementById('downloadLink').href = `/api/video/download/${jobId}`;
+                    
+                    // Original Knolify URL
+                    if (status.result.original_url) {
+                        document.getElementById('originalVideoUrl').href = status.result.original_url;
+                        document.getElementById('originalUrlSection').classList.remove('d-none');
+                    } else {
+                        document.getElementById('originalUrlSection').classList.add('d-none');
+                    }
+                    
+                    // Subtitles
+                    if (status.result.vtt_file || status.result.srt_file) {
+                        document.getElementById('subtitlesSection').classList.remove('d-none');
+                        if (status.result.vtt_file) {
+                            document.getElementById('vttLink').href = status.result.vtt_file;
+                        }
+                        if (status.result.srt_file) {
+                            document.getElementById('srtLink').href = status.result.srt_file;
+                        }
+                    }
                 }
+                
+                // Store job ID for potential later use
+                document.getElementById('generateAnotherBtn').setAttribute('data-last-job', jobId);
                 
                 break; // Exit polling loop
             } else if (status.status === 'failed') {

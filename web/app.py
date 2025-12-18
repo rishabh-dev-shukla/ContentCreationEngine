@@ -1450,6 +1450,59 @@ def api_video_status(job_id):
     return jsonify(response)
 
 
+@app.route('/api/video/download/<job_id>', methods=['GET'])
+@login_required
+def api_download_video(job_id):
+    """API: Download a generated video file."""
+    from flask import send_file
+    
+    # Get job status
+    job = get_job_status(job_id)
+    if not job:
+        return jsonify({'success': False, 'error': 'Job not found'}), 404
+    
+    if job.get('status') != 'completed':
+        return jsonify({'success': False, 'error': 'Video not ready yet'}), 400
+    
+    result = job.get('result', {})
+    video_path = result.get('processed_video')
+    
+    if not video_path or not Path(video_path).exists():
+        # Try original URL as fallback
+        original_url = result.get('original_url')
+        if original_url:
+            return redirect(original_url)
+        return jsonify({'success': False, 'error': 'Video file not found'}), 404
+    
+    return send_file(
+        video_path,
+        mimetype='video/mp4',
+        as_attachment=True,
+        download_name=f'{job_id}.mp4'
+    )
+
+
+@app.route('/api/video/info/<job_id>', methods=['GET'])
+@login_required
+def api_video_info(job_id):
+    """API: Get video URLs for download/viewing."""
+    job = get_job_status(job_id)
+    if not job:
+        return jsonify({'success': False, 'error': 'Job not found'}), 404
+    
+    result = job.get('result', {})
+    
+    return jsonify({
+        'success': True,
+        'job_id': job_id,
+        'status': job.get('status'),
+        'original_url': result.get('original_url'),  # Knolify hosted URL
+        'vtt_file': result.get('vtt_file'),
+        'srt_file': result.get('srt_file'),
+        'download_url': f'/api/video/download/{job_id}' if job.get('status') == 'completed' else None
+    })
+
+
 # =============================================================================
 # Error Handlers
 # =============================================================================
