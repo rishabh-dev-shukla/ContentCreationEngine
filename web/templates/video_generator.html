@@ -400,13 +400,17 @@ document.getElementById('videoGenerateForm').addEventListener('submit', async fu
 async function pollVideoStatus(jobId, progressInterval) {
     const pollInterval = 2000; // Poll every 2 seconds
     
+    console.log('Starting to poll for job:', jobId);
+    
     while (true) {
         try {
             const response = await fetch(`/api/video/status/${jobId}`);
             const status = await response.json();
             
+            console.log('Poll response:', status);
+            
             if (!status.success) {
-                throw new Error('Failed to get job status');
+                throw new Error(status.error || 'Failed to get job status');
             }
             
             // Update progress if available

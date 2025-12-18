@@ -1296,6 +1296,9 @@ def api_generate_video():
         'started_at': datetime.now().isoformat()
     }
     
+    logger.info(f"Created video job: {job_id}")
+    logger.info(f"Active video jobs: {list(video_jobs.keys())}")
+    
     # Start background thread
     thread = Thread(
         target=_generate_video_background,
@@ -1304,6 +1307,8 @@ def api_generate_video():
     )
     thread.daemon = True
     thread.start()
+    
+    logger.info(f"Started background thread for job: {job_id}")
     
     return jsonify({
         'success': True,
@@ -1316,8 +1321,16 @@ def api_generate_video():
 @login_required
 def api_video_status(job_id):
     """API: Check video generation job status."""
+    logger.info(f"Status check for job: {job_id}")
+    logger.info(f"Available jobs: {list(video_jobs.keys())}")
+    
     if job_id not in video_jobs:
-        return jsonify({'success': False, 'error': 'Job not found'}), 404
+        logger.error(f"Job not found: {job_id}")
+        return jsonify({
+            'success': False, 
+            'error': f'Job not found: {job_id}',
+            'available_jobs': list(video_jobs.keys())
+        }), 404
     
     job = video_jobs[job_id]
     response = {
@@ -1330,6 +1343,7 @@ def api_video_status(job_id):
     if job['status'] == 'completed':
         response['result'] = job.get('result', {})
     
+    logger.info(f"Job {job_id} status: {job['status']}, progress: {job['progress']}%")
     return jsonify(response)
 
 
