@@ -53,6 +53,13 @@ generation_jobs = {}
 insights_jobs = {}
 video_jobs = {}
 
+# Log application startup
+import time
+APP_START_TIME = time.time()
+APP_START_ID = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+logger.info(f"=== APPLICATION STARTED === ID: {APP_START_ID}, Time: {datetime.now()}")
+logger.info(f"Worker PID: {os.getpid()}")
+
 
 # =============================================================================
 # Context Processor - Make auth info available to all templates
@@ -1303,6 +1310,7 @@ def _generate_video_background(job_id, problem_statement, background_color, api_
 def api_generate_video():
     """API: Start video generation in background."""
     logger.info("=== Video generation endpoint called ===")
+    logger.info(f"App start ID: {APP_START_ID}, PID: {os.getpid()}, Uptime: {time.time() - APP_START_TIME:.1f}s")
     logger.info(f"Current video_jobs before creation: {list(video_jobs.keys())}")
     
     data = request.json
@@ -1361,6 +1369,7 @@ def api_generate_video():
 def api_video_status(job_id):
     """API: Check video generation job status."""
     logger.info(f"Status check for job: {job_id}")
+    logger.info(f"App start ID: {APP_START_ID}, PID: {os.getpid()}, Uptime: {time.time() - APP_START_TIME:.1f}s")
     logger.info(f"Available jobs: {list(video_jobs.keys())}")
     
     if job_id not in video_jobs:
