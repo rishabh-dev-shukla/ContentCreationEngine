@@ -370,29 +370,13 @@ document.getElementById('videoGenerateForm').addEventListener('submit', async fu
         
         const result = await response.json();
         
-        // Stop the progress interval
-        clearInterval(progressInterval);
-        
-        if (result.success) {
-            // Complete progress to 100%
-            updateCircularProgress(100);
-            
-            // Wait a moment to show 100%
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Show success
-            document.getElementById('statusRunning').classList.add('d-none');
-            document.getElementById('statusCompleted').classList.remove('d-none');
-            
-            // Populate output info (just the path)
-            document.getElementById('outputVideoPath').textContent = result.processed_video || 'N/A';
-            
-            // Store output folder for "Copy Path" button
-            document.getElementById('openFolderBtn').setAttribute('data-folder', result.processed_video || '');
-            
-        } else {
-            throw new Error(result.error || 'Unknown error occurred');
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to start video generation');
         }
+        
+        // Got job ID - now poll for status
+        const jobId = result.job_id;
+        await pollVideoStatus(jobId, progressInterval);
         
     } catch (error) {
         console.error('Generation error:', error);
@@ -411,6 +395,72 @@ document.getElementById('videoGenerateForm').addEventListener('submit', async fu
         generateBtn.innerHTML = '<i class="bi bi-play-circle me-2"></i>Generate Video';
     }
 });
+
+// Poll for video generation status
+async function pollVideoStatus(jobId, progressInterval) {
+    const pollInterval = 2000; // Poll every 2 seconds
+    
+    while (true) {
+        try {
+            const response = await fetch(`/api/video/status/${jobId}`);
+            const status = await response.json();
+            
+            if (!status.success) {
+                throw new Error('Failed to get job status');
+            }
+            
+            // Update progress if available
+            if (status.progress !== undefined) {
+                updateCircularProgress(status.progress);
+            }
+            
+            // Update status message if available
+            if (status.message) {
+                console.log('Status:', status.message);
+            }
+            
+            // Check if job is complete
+            if (status.status === 'completed') {
+                // Stop the progress interval
+                clearInterval(progressInterval);
+                
+                // Complete progress to 100%
+                updateCircularProgress(100);
+                
+                // Wait a moment to show 100%
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Show success
+                document.getElementById('statusRunning').classList.add('d-none');
+                document.getElementById('statusCompleted').classList.remove('d-none');
+                
+                // Populate output info
+                if (status.result) {
+                    document.getElementById('outputVideoPath').textContent = status.result.processed_video || 'N/A';
+                    document.getElementById('openFolderBtn').setAttribute('data-folder', status.result.processed_video || '');
+                }
+                
+                break; // Exit polling loop
+            } else if (status.status === 'failed') {
+                throw new Error(status.message || 'Video generation failed');
+            }
+            
+            // Wait before next poll
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            
+        } catch (error) {
+            console.error('Polling error:', error);
+            clearInterval(progressInterval);
+            
+            // Show error state
+            document.getElementById('statusRunning').classList.add('d-none');
+            document.getElementById('statusError').classList.remove('d-none');
+            document.getElementById('errorMessage').textContent = error.message;
+            
+            break; // Exit polling loop
+        }
+    }
+}
 
 // Update circular progress bar
 function updateCircularProgress(percent) {

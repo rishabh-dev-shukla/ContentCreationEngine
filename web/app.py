@@ -51,6 +51,7 @@ FIREBASE_CONFIG = {
 # Global state for tracking generation jobs
 generation_jobs = {}
 insights_jobs = {}
+video_jobs = {}
 
 
 # =============================================================================
@@ -1164,47 +1165,29 @@ def video_generator_page():
                           recent_videos=recent_videos)
 
 
-@app.route('/api/video/generate', methods=['POST'])
-@login_required
-def api_generate_video():
-    """API: Generate an AI video with watermark removal."""
-    data = request.json
-    
-    # Extract parameters
-    problem_statement = data.get('problem_statement', '').strip()
-    background_color = data.get('background_color', '#FFFFFF')
-    api_type = data.get('api_type', 'prism')  # 'prism' or 'grant'
-    video_quality = data.get('video_quality', 'high')  # 'low', 'medium', 'high', 'production'
-    output_dir = data.get('output_dir', str(VIDEO_OUTPUT_DIR))
-    
-    # Default watermark patch settings (not exposed to users)
-    patch_width = 400
-    patch_height = 70
-    patch_position = 'bottom-right'
-    
-    # Validate required fields
-    if not problem_statement:
-        return jsonify({'success': False, 'error': 'Problem statement is required'}), 400
-    
-    # Convert hex color to RGB tuple for watermark patch
-    def hex_to_rgb(hex_color):
-        hex_color = hex_color.lstrip('#')
-        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-    
+def _generate_video_background(job_id, problem_statement, background_color, api_type, 
+                                video_quality, output_dir, patch_width, patch_height, patch_position):
+    """Background task for video generation."""
     try:
-        patch_color = hex_to_rgb(background_color)
-    except:
-        patch_color = (255, 255, 255)  # Default to white
-    
-    try:
+        # Convert hex color to RGB tuple for watermark patch
+        def hex_to_rgb(hex_color):
+            hex_color = hex_color.lstrip('#')
+            return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        
+        try:
+            patch_color = hex_to_rgb(background_color)
+        except:
+            patch_color = (255, 255, 255)  # Default to white
+        
         # Import video generation modules
         from video_gen.math_ai_video_generator import generate_math_ai_video
         from video_gen.process_video import remove_watermark_with_patch
         import time
         
         # Step 1: Generate video using Knolify API
+        video_jobs[job_id]['message'] = 'Sending request to Knolify API...'
+        video_jobs[job_id]['progress'] = 10
         logger.info(f"Generating video for problem: {problem_statement[:50]}...")
-        logger.info(f"Using {api_type.upper()} API with background color: {background_color}")
         
         result = generate_math_ai_video(
             math_problem=problem_statement,
@@ -1218,15 +1201,16 @@ def api_generate_video():
         if not video_url:
             raise Exception("No video URL returned from Knolify API")
         
-        logger.info(f"Video generated: {video_url}")
-        
         # Step 2: Create output directory with timestamp
+        video_jobs[job_id]['message'] = 'Video generated! Processing watermark removal...'
+        video_jobs[job_id]['progress'] = 60
+        
         timestamp = int(time.time())
         output_folder = Path(output_dir) / f"video_{timestamp}"
         output_folder.mkdir(parents=True, exist_ok=True)
         output_path = output_folder / "video_processed.mp4"
         
-        # Step 3: Remove watermark with patch (using same background color)
+        # Step 3: Remove watermark with patch
         logger.info(f"Removing watermark with {patch_color} patch...")
         processed_video = remove_watermark_with_patch(
             video_input=video_url,
@@ -1240,6 +1224,9 @@ def api_generate_video():
         )
         
         # Step 4: Save metadata
+        video_jobs[job_id]['message'] = 'Saving metadata...'
+        video_jobs[job_id]['progress'] = 90
+        
         metadata = {
             'problem': problem_statement,
             'background_color': background_color,
@@ -1258,23 +1245,92 @@ def api_generate_video():
         
         logger.info(f"Video processing complete: {processed_video}")
         
-        return jsonify({
-            'success': True,
+        # Update job status
+        video_jobs[job_id]['status'] = 'completed'
+        video_jobs[job_id]['progress'] = 100
+        video_jobs[job_id]['message'] = 'Video generation completed!'
+        video_jobs[job_id]['result'] = {
             'processed_video': str(processed_video),
             'original_url': video_url,
             'vtt_file': result.get('vtt_file'),
             'srt_file': result.get('srt_file'),
             'output_folder': str(output_folder)
-        })
+        }
         
     except Exception as e:
         logger.error(f"Video generation error: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        video_jobs[job_id]['status'] = 'failed'
+        video_jobs[job_id]['message'] = f'Error: {str(e)}'
+
+
+@app.route('/api/video/generate', methods=['POST'])
+@login_required
+def api_generate_video():
+    """API: Start video generation in background."""
+    data = request.json
+    
+    # Extract parameters
+    problem_statement = data.get('problem_statement', '').strip()
+    background_color = data.get('background_color', '#FFFFFF')
+    api_type = data.get('api_type', 'prism')  # 'prism' or 'grant'
+    video_quality = data.get('video_quality', 'high')  # 'low', 'medium', 'high', 'production'
+    output_dir = data.get('output_dir', str(VIDEO_OUTPUT_DIR))
+    
+    # Default watermark patch settings (not exposed to users)
+    patch_width = 400
+    patch_height = 70
+    patch_position = 'bottom-right'
+    
+    # Validate required fields
+    if not problem_statement:
+        return jsonify({'success': False, 'error': 'Problem statement is required'}), 400
+    
+    # Create job ID and initialize job tracking
+    job_id = f"video_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    video_jobs[job_id] = {
+        'status': 'running',
+        'progress': 0,
+        'message': 'Starting video generation...',
+        'started_at': datetime.now().isoformat()
+    }
+    
+    # Start background thread
+    thread = Thread(
+        target=_generate_video_background,
+        args=(job_id, problem_statement, background_color, api_type, 
+              video_quality, output_dir, patch_width, patch_height, patch_position)
+    )
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({
+        'success': True,
+        'job_id': job_id,
+        'message': 'Video generation started in background'
+    })
+
+
+@app.route('/api/video/status/<job_id>', methods=['GET'])
+@login_required
+def api_video_status(job_id):
+    """API: Check video generation job status."""
+    if job_id not in video_jobs:
+        return jsonify({'success': False, 'error': 'Job not found'}), 404
+    
+    job = video_jobs[job_id]
+    response = {
+        'success': True,
+        'status': job['status'],
+        'progress': job['progress'],
+        'message': job['message']
+    }
+    
+    if job['status'] == 'completed':
+        response['result'] = job.get('result', {})
+    
+    return jsonify(response)
 
 
 # =============================================================================
