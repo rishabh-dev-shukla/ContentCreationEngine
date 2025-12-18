@@ -1168,6 +1168,9 @@ def video_generator_page():
 def _generate_video_background(job_id, problem_statement, background_color, api_type, 
                                 video_quality, output_dir, patch_width, patch_height, patch_position):
     """Background task for video generation."""
+    logger.info(f"=== Background thread started for job: {job_id} ===")
+    logger.info(f"video_jobs at thread start: {list(video_jobs.keys())}")
+    
     try:
         # Convert hex color to RGB tuple for watermark patch
         def hex_to_rgb(hex_color):
@@ -1269,6 +1272,9 @@ def _generate_video_background(job_id, problem_statement, background_color, api_
 @login_required
 def api_generate_video():
     """API: Start video generation in background."""
+    logger.info("=== Video generation endpoint called ===")
+    logger.info(f"Current video_jobs before creation: {list(video_jobs.keys())}")
+    
     data = request.json
     
     # Extract parameters
@@ -1309,12 +1315,15 @@ def api_generate_video():
     thread.start()
     
     logger.info(f"Started background thread for job: {job_id}")
+    logger.info(f"Returning job_id to client: {job_id}")
     
-    return jsonify({
+    response = jsonify({
         'success': True,
         'job_id': job_id,
         'message': 'Video generation started in background'
     })
+    logger.info(f"Response being sent: {response.get_json()}")
+    return response
 
 
 @app.route('/api/video/status/<job_id>', methods=['GET'])
