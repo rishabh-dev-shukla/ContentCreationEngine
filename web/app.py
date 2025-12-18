@@ -48,10 +48,51 @@ FIREBASE_CONFIG = {
     'appId': os.getenv('FIREBASE_APP_ID', '')
 }
 
-# Global state for tracking generation jobs
+# Global state for tracking generation jobs (in-memory fallback)
 generation_jobs = {}
 insights_jobs = {}
 video_jobs = {}
+
+# Persistent job tracking directory
+JOBS_DIR = Path(settings.output_dir) / '.jobs'
+JOBS_DIR.mkdir(exist_ok=True)
+
+def save_job_status(job_id, job_data):
+    """Save job status to filesystem for persistence across worker restarts."""
+    try:
+        job_file = JOBS_DIR / f"{job_id}.json"
+        with open(job_file, 'w') as f:
+            json.dump(job_data, f)
+    except Exception as e:
+        logger.error(f"Failed to save job status: {e}")
+
+def load_job_status(job_id):
+    """Load job status from filesystem."""
+    try:
+        job_file = JOBS_DIR / f"{job_id}.json"
+        if job_file.exists():
+            with open(job_file, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load job status: {e}")
+    return None
+
+def get_job_status(job_id):
+    """Get job status from memory or filesystem."""
+    # Try memory first
+    if job_id in video_jobs:
+        return video_jobs[job_id]
+    # Fall back to filesystem
+    return load_job_status(job_id)
+
+def update_job_status(job_id, updates):
+    """Update job status in both memory and filesystem."""
+    # Update memory
+    if job_id not in video_jobs:
+        video_jobs[job_id] = {}
+    video_jobs[job_id].update(updates)
+    # Save to filesystem
+    save_job_status(job_id, video_jobs[job_id])
 
 # Log application startup
 import time
@@ -1195,8 +1236,7 @@ def _generate_video_background(job_id, problem_statement, background_color, api_
         import time
         
         # Step 1: Generate video using Knolify API
-        video_jobs[job_id]['message'] = 'Sending request to Knolify API...'
-        video_jobs[job_id]['progress'] = 10
+        update_job_status(job_id, {'message': 'Sending request to Knolify API...', 'progress': 10})
         logger.info(f"Generating video for problem: {problem_statement[:50]}...")
         
         try:
@@ -1216,8 +1256,7 @@ def _generate_video_background(job_id, problem_statement, background_color, api_
             raise Exception("No video URL returned from Knolify API")
         
         # Step 2: Create output directory with timestamp
-        video_jobs[job_id]['message'] = 'Video generated! Processing watermark removal...'
-        video_jobs[job_id]['progress'] = 60
+        update_job_status(job_id, {'message': 'Video generated! Processing watermark removal...', 'progress': 60})
         
         timestamp = int(time.time())
         output_folder = Path(output_dir) / f"video_{timestamp}"
@@ -1238,8 +1277,7 @@ def _generate_video_background(job_id, problem_statement, background_color, api_
         )
         
         # Step 4: Save metadata
-        video_jobs[job_id]['message'] = 'Saving metadata...'
-        video_jobs[job_id]['progress'] = 90
+        update_job_status(job_id, {'message': 'Saving metadata...', 'progress': 90})
         
         metadata = {
             'problem': problem_statement,
@@ -1260,16 +1298,18 @@ def _generate_video_background(job_id, problem_statement, background_color, api_
         logger.info(f"Video processing complete: {processed_video}")
         
         # Update job status
-        video_jobs[job_id]['status'] = 'completed'
-        video_jobs[job_id]['progress'] = 100
-        video_jobs[job_id]['message'] = 'Video generation completed!'
-        video_jobs[job_id]['result'] = {
-            'processed_video': str(processed_video),
-            'original_url': video_url,
-            'vtt_file': result.get('vtt_file'),
-            'srt_file': result.get('srt_file'),
-            'output_folder': str(output_folder)
-        }
+        update_job_status(job_id, {
+            'status': 'completed',
+            'progress': 100,
+            'message': 'Video generation completed!',
+            'result': {
+                'processed_video': str(processed_video),
+                'original_url': video_url,
+                'vtt_file': result.get('vtt_file'),
+                'srt_file': result.get('srt_file'),
+                'output_folder': str(output_folder)
+            }
+        })
         
     except Exception as e:
         logger.error(f"Video generation error for job {job_id}: {e}")
@@ -1278,20 +1318,23 @@ def _generate_video_background(job_id, problem_statement, background_color, api_
         
         # Defensive update - check if job still exists
         try:
-            if job_id in video_jobs:
-                video_jobs[job_id]['status'] = 'failed'
-                video_jobs[job_id]['progress'] = 0
-                video_jobs[job_id]['message'] = f'Error: {str(e)}'
+            current_job = get_job_status(job_id)
+            if current_job:
+                update_job_status(job_id, {
+                    'status': 'failed',
+                    'progress': 0,
+                    'message': f'Error: {str(e)}'
+                })
                 logger.info(f"Updated job {job_id} to failed status")
             else:
                 # Job disappeared! Recreate it with error status
-                logger.error(f"Job {job_id} disappeared from video_jobs! Recreating with error status")
-                video_jobs[job_id] = {
+                logger.error(f"Job {job_id} not found! Creating with error status")
+                update_job_status(job_id, {
                     'status': 'failed',
                     'progress': 0,
                     'message': f'Error: {str(e)}',
                     'started_at': datetime.now().isoformat()
-                }
+                })
         except Exception as update_error:
             logger.error(f"Failed to update job status: {update_error}")
     
@@ -1333,12 +1376,12 @@ def api_generate_video():
     
     # Create job ID and initialize job tracking
     job_id = f"video_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    video_jobs[job_id] = {
+    update_job_status(job_id, {
         'status': 'running',
         'progress': 0,
         'message': 'Starting video generation...',
         'started_at': datetime.now().isoformat()
-    }
+    })
     
     logger.info(f"Created video job: {job_id}")
     logger.info(f"Active video jobs: {list(video_jobs.keys())}")
@@ -1373,12 +1416,19 @@ def api_video_status(job_id):
     logger.info(f"Available jobs: {list(video_jobs.keys())}")
     
     if job_id not in video_jobs:
-        logger.error(f"Job not found: {job_id}")
-        return jsonify({
-            'success': False, 
-            'error': f'Job not found: {job_id}',
-            'available_jobs': list(video_jobs.keys())
-        }), 404
+        # Try loading from filesystem
+        job = load_job_status(job_id)
+        if job:
+            # Restore to memory
+            video_jobs[job_id] = job
+            logger.info(f"Restored job {job_id} from filesystem")
+        else:
+            logger.error(f"Job not found: {job_id}")
+            return jsonify({
+                'success': False, 
+                'error': f'Job not found: {job_id}',
+                'available_jobs': list(video_jobs.keys())
+            }), 404
     
     job = video_jobs[job_id]
     response = {
