@@ -1363,7 +1363,12 @@ def api_generate_video():
     background_color = data.get('background_color', '#FFFFFF')
     api_type = data.get('api_type', 'prism')  # 'prism' or 'grant'
     video_quality = data.get('video_quality', 'high')  # 'low', 'medium', 'high', 'production'
-    output_dir = data.get('output_dir', str(VIDEO_OUTPUT_DIR))
+    
+    # ALWAYS use server-side path (ignore client-provided path which may be Windows)
+    output_dir = str(VIDEO_OUTPUT_DIR)
+    
+    # Ensure output directory exists
+    VIDEO_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     
     # Default watermark patch settings (not exposed to users)
     patch_width = 400
