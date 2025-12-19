@@ -183,25 +183,15 @@ Or: Explain how to find the derivative of f(x) = x² + 3x + 2"></textarea>
                     </div>
                     
                     <div class="mb-4">
-                        <h6><i class="bi bi-link-45deg me-2"></i>Download Links</h6>
+                        <h6><i class="bi bi-download me-2"></i>Download Your Video</h6>
                         <div class="bg-light p-3 rounded">
-                            <div class="mb-2">
-                                <strong>Processed Video:</strong><br>
-                                <a href="#" id="downloadLink" class="btn btn-sm btn-success mt-1">
-                                    <i class="bi bi-download me-1"></i>Download Video
-                                </a>
-                            </div>
-                            <div class="mb-2" id="originalUrlSection">
-                                <strong>Original (Knolify Hosted):</strong><br>
-                                <a href="#" id="originalVideoUrl" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
-                                    <i class="bi bi-box-arrow-up-right me-1"></i>View Original
-                                </a>
-                            </div>
-                            <div id="subtitlesSection" class="d-none">
-                                <strong>Subtitles:</strong><br>
-                                <a href="#" id="vttLink" target="_blank" class="btn btn-sm btn-outline-secondary mt-1 me-1">VTT</a>
-                                <a href="#" id="srtLink" target="_blank" class="btn btn-sm btn-outline-secondary mt-1">SRT</a>
-                            </div>
+                            <a href="#" id="downloadLink" class="btn btn-success">
+                                <i class="bi bi-download me-1"></i>Download Video
+                            </a>
+                            <p class="text-muted small mt-2 mb-0">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Download link saved in Recent Videos below.
+                            </p>
                         </div>
                     </div>
                     
@@ -245,20 +235,30 @@ Or: Explain how to find the derivative of f(x) = x² + 3x + 2"></textarea>
                             <tr>
                                 <th>Created</th>
                                 <th>Problem</th>
-                                <th>Output Folder</th>
                                 <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for video in recent_videos %}
                             <tr>
-                                <td>{{ video.created_at }}</td>
-                                <td class="text-truncate" style="max-width: 300px;">{{ video.problem[:100] }}...</td>
-                                <td class="output-info">{{ video.output_folder }}</td>
+                                <td>{{ video.created_at[:19] if video.created_at else 'N/A' }}</td>
+                                <td class="text-truncate" style="max-width: 300px;">{{ (video.problem[:80] ~ '...') if video.problem and video.problem|length > 80 else video.problem or 'N/A' }}</td>
                                 <td>
-                                    <span class="badge bg-{{ 'success' if video.status == 'completed' else 'warning' }}">
-                                        {{ video.status }}
+                                    <span class="badge bg-{{ 'success' if video.status == 'completed' else ('danger' if video.status == 'failed' else 'warning') }}">
+                                        {{ video.status or 'unknown' }}
                                     </span>
+                                </td>
+                                <td>
+                                    {% if video.status == 'completed' and video.job_id %}
+                                    <a href="/api/video/download/{{ video.job_id }}" class="btn btn-sm btn-success" title="Download Video">
+                                        <i class="bi bi-download"></i>
+                                    </a>
+                                    {% elif video.status == 'failed' %}
+                                    <span class="text-muted small">Failed</span>
+                                    {% else %}
+                                    <span class="text-muted small">Processing...</span>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -455,25 +455,6 @@ async function pollVideoStatus(jobId, progressInterval) {
                 if (status.result) {
                     // Download link for processed video
                     document.getElementById('downloadLink').href = `/api/video/download/${jobId}`;
-                    
-                    // Original Knolify URL
-                    if (status.result.original_url) {
-                        document.getElementById('originalVideoUrl').href = status.result.original_url;
-                        document.getElementById('originalUrlSection').classList.remove('d-none');
-                    } else {
-                        document.getElementById('originalUrlSection').classList.add('d-none');
-                    }
-                    
-                    // Subtitles
-                    if (status.result.vtt_file || status.result.srt_file) {
-                        document.getElementById('subtitlesSection').classList.remove('d-none');
-                        if (status.result.vtt_file) {
-                            document.getElementById('vttLink').href = status.result.vtt_file;
-                        }
-                        if (status.result.srt_file) {
-                            document.getElementById('srtLink').href = status.result.srt_file;
-                        }
-                    }
                 }
                 
                 // Store job ID for potential later use

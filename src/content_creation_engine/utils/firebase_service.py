@@ -748,6 +748,76 @@ class FirebaseService:
         except Exception as e:
             logger.error(f"Error listing insights: {e}")
             return []
+    
+    # =========================================================================
+    # Video Jobs Methods
+    # =========================================================================
+    
+    def save_video_job(
+        self, 
+        customer_id: str, 
+        job_id: str,
+        job_data: Dict[str, Any]
+    ) -> str:
+        """
+        Save a video generation job record.
+        
+        Args:
+            customer_id: Customer document ID
+            job_id: Video job ID
+            job_data: Job data to store
+            
+        Returns:
+            Job document ID
+        """
+        try:
+            job_data['saved_at'] = datetime.utcnow().isoformat()
+            
+            (self.db.collection('customers')
+             .document(customer_id)
+             .collection('video_jobs')
+             .document(job_id)
+             .set(job_data, merge=True))
+            
+            logger.info(f"Video job saved: {customer_id}/{job_id}")
+            return job_id
+        except Exception as e:
+            logger.error(f"Error saving video job: {e}")
+            raise
+    
+    def list_video_jobs(
+        self, 
+        customer_id: str, 
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        List video generation jobs for a customer.
+        
+        Args:
+            customer_id: Customer document ID
+            limit: Maximum number of results
+            
+        Returns:
+            List of video job documents
+        """
+        try:
+            docs = (self.db.collection('customers')
+                   .document(customer_id)
+                   .collection('video_jobs')
+                   .order_by('saved_at', direction=firestore.Query.DESCENDING)
+                   .limit(limit)
+                   .get())
+            
+            jobs = []
+            for doc in docs:
+                data = doc.to_dict()
+                data['job_id'] = doc.id
+                jobs.append(data)
+            
+            return jobs
+        except Exception as e:
+            logger.error(f"Error listing video jobs: {e}")
+            return []
 
 
 # Global instance

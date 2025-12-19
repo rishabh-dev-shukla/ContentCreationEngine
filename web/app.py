@@ -1172,31 +1172,36 @@ def get_recent_videos() -> list:
     videos = []
     video_dir = VIDEO_OUTPUT_DIR
     
-    if not video_dir.exists():
-        return videos
+    # Get videos from Firebase (persistent) and local job files
+    customer_id = get_current_customer_id()
     
-    # Get all timestamped folders
-    for folder in sorted(video_dir.iterdir(), reverse=True):
-        if folder.is_dir() and folder.name.startswith('video_'):
-            # Check for video files
-            video_files = list(folder.glob('*.mp4'))
-            if video_files:
-                # Try to read metadata if exists
-                metadata_file = folder / 'metadata.json'
-                metadata = {}
-                if metadata_file.exists():
-                    try:
-                        with open(metadata_file, 'r', encoding='utf-8') as f:
-                            metadata = json.load(f)
-                    except:
-                        pass
-                
-                videos.append({
-                    'created_at': folder.name.replace('video_', ''),
-                    'problem': metadata.get('problem', 'Unknown'),
-                    'output_folder': str(folder),
-                    'status': 'completed'
-                })
+    # First, try to get from Firebase
+    if customer_id:
+        from src.content_creation_engine.utils.firebase_service import get_firebase_service
+        firebase = get_firebase_service()
+        if firebase:
+            try:
+                videos = firebase.list_video_jobs(customer_id, limit=10)
+                if videos:
+                    return videos
+            except Exception as e:
+                logger.error(f"Error getting videos from Firebase: {e}")
+    
+    # Fallback: Get from local job files
+    jobs_dir = JOBS_DIR
+    if jobs_dir.exists():
+        for job_file in sorted(jobs_dir.glob("video_*.json"), reverse=True):
+            try:
+                with open(job_file, 'r') as f:
+                    job_data = json.load(f)
+                    videos.append({
+                        'job_id': job_file.stem,
+                        'created_at': job_data.get('started_at', ''),
+                        'problem': job_data.get('problem', 'Unknown'),
+                        'status': job_data.get('status', 'unknown')
+                    })
+            except:
+                pass
     
     return videos[:10]  # Return only the 10 most recent
 
@@ -1302,14 +1307,32 @@ def _generate_video_background(job_id, problem_statement, background_color, api_
             'status': 'completed',
             'progress': 100,
             'message': 'Video generation completed!',
+            'problem': problem_statement,
             'result': {
                 'processed_video': str(processed_video),
-                'original_url': video_url,
-                'vtt_file': result.get('vtt_file'),
-                'srt_file': result.get('srt_file'),
                 'output_folder': str(output_folder)
             }
         })
+        
+        # Save to Firebase for persistence across server restarts
+        try:
+            from src.content_creation_engine.utils.firebase_service import get_firebase_service
+            firebase = get_firebase_service()
+            job_data = get_job_status(job_id)
+            customer_id = job_data.get('customer_id') if job_data else None
+            if firebase and customer_id:
+                firebase.save_video_job(customer_id, job_id, {
+                    'job_id': job_id,
+                    'status': 'completed',
+                    'problem': problem_statement,
+                    'created_at': datetime.now().isoformat(),
+                    'background_color': background_color,
+                    'api_type': api_type,
+                    'video_quality': video_quality
+                })
+                logger.info(f"Saved video job {job_id} to Firebase")
+        except Exception as fb_error:
+            logger.error(f"Failed to save video job to Firebase: {fb_error}")
         
     except Exception as e:
         logger.error(f"Video generation error for job {job_id}: {e}")
@@ -1379,13 +1402,18 @@ def api_generate_video():
     if not problem_statement:
         return jsonify({'success': False, 'error': 'Problem statement is required'}), 400
     
+    # Get customer ID for Firebase storage
+    customer_id = get_current_customer_id()
+    
     # Create job ID and initialize job tracking
     job_id = f"video_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     update_job_status(job_id, {
         'status': 'running',
         'progress': 0,
         'message': 'Starting video generation...',
-        'started_at': datetime.now().isoformat()
+        'started_at': datetime.now().isoformat(),
+        'problem': problem_statement,
+        'customer_id': customer_id
     })
     
     logger.info(f"Created video job: {job_id}")
