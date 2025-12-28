@@ -490,6 +490,26 @@ def content_page():
 @login_required
 def view_content_detail(persona_id, filename):
     """View detailed content output."""
+    customer_id = get_current_customer_id()
+    
+    # Try Firebase first if customer is logged in
+    if customer_id:
+        from src.content_creation_engine.utils.firebase_service import get_firebase_service
+        firebase = get_firebase_service()
+        if firebase:
+            try:
+                # The filename from Firebase is the document ID
+                output_id = filename.replace('.json', '') if filename.endswith('.json') else filename
+                content = firebase.get_content_output(customer_id, persona_id, output_id)
+                if content:
+                    return render_template('content_detail.html',
+                                          content=content,
+                                          persona_id=persona_id,
+                                          filename=filename)
+            except Exception as e:
+                logger.error(f"Error loading content from Firebase: {e}")
+    
+    # Fallback to local files
     file_path = settings.output_dir / persona_id / filename
     
     if not file_path.exists():
