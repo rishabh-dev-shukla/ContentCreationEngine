@@ -533,6 +533,80 @@ class FirebaseService:
             logger.error(f"Error updating script status: {e}")
             return False
     
+    def add_manual_script(
+        self,
+        customer_id: str,
+        persona_id: str,
+        script_data: Dict[str, Any]
+    ) -> Optional[str]:
+        """
+        Add a manual script to a persona's manual content collection.
+        
+        Args:
+            customer_id: Customer document ID
+            persona_id: Persona document ID
+            script_data: Script data including title, content, etc.
+            
+        Returns:
+            Output document ID if created successfully, None otherwise
+        """
+        try:
+            # Create a manual content output document if needed
+            output_id = f"manual_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+            
+            # Mark the script as manual
+            script = {
+                **script_data,
+                'is_manual': True,
+                'created_at': datetime.utcnow().isoformat(),
+                'last_edited': datetime.utcnow().isoformat(),
+                'status': script_data.get('status', 'pending')
+            }
+            
+            # Check if a manual content document exists for today
+            today_id = f"manual_{datetime.utcnow().strftime('%Y-%m-%d')}"
+            existing_output = self.get_content_output(customer_id, persona_id, today_id)
+            
+            if existing_output:
+                # Add to existing manual output
+                scripts = existing_output.get('scripts', [])
+                scripts.append(script)
+                
+                (self.db.collection('customers')
+                 .document(customer_id)
+                 .collection('personas')
+                 .document(persona_id)
+                 .collection('outputs')
+                 .document(today_id)
+                 .update({'scripts': scripts}))
+                
+                return today_id
+            else:
+                # Create new manual output document
+                output_data = {
+                    'persona_id': persona_id,
+                    'date': datetime.utcnow().strftime('%Y-%m-%d'),
+                    'niche': script_data.get('niche', 'Manual Content'),
+                    'is_manual': True,
+                    'content_ideas': [],
+                    'scripts': [script],
+                    'visuals': [],
+                    'created_at': datetime.utcnow().isoformat()
+                }
+                
+                (self.db.collection('customers')
+                 .document(customer_id)
+                 .collection('personas')
+                 .document(persona_id)
+                 .collection('outputs')
+                 .document(today_id)
+                 .set(output_data))
+                
+                return today_id
+        except Exception as e:
+            logger.error(f"Error adding manual script: {e}")
+            return None
+    
     # =========================================================================
     # Research Cache Methods
     # =========================================================================

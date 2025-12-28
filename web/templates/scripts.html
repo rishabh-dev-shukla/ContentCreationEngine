@@ -11,6 +11,11 @@
         </h1>
         <p class="text-muted">All scripts generated for your personas. Filter by status and view as table or tiles.</p>
     </div>
+    <div class="col-auto">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addManualScriptModal">
+            <i class="bi bi-plus-circle me-2"></i>Add Manual Script
+        </button>
+    </div>
 </div>
 
 <!-- Persona Selector -->
@@ -63,6 +68,9 @@
                         <a href="/content/{{ persona_id }}/{{ script.filename }}" class="text-decoration-none" onclick="event.stopPropagation()">
                             {{ script.title or script.idea_title or 'Untitled' }}
                         </a>
+                        {% if script.is_manual %}
+                        <span class="badge bg-info ms-2" title="Manually added"><i class="bi bi-pencil-square"></i> Manual</span>
+                        {% endif %}
                     </td>
                     <td>
                         {% if script.status %}
@@ -95,6 +103,9 @@
                         <a href="/content/{{ persona_id }}/{{ script.filename }}" class="text-decoration-none stretched-link" onclick="event.stopPropagation()">
                             {{ script.title or script.idea_title or 'Untitled' }}
                         </a>
+                        {% if script.is_manual %}
+                        <span class="badge bg-info ms-2" title="Manually added"><i class="bi bi-pencil-square"></i> Manual</span>
+                        {% endif %}
                     </h6>
                     <p class="card-text small text-muted">{{ (script.full_script or script.main_content or script.script or script.content or '')[:120] }}...</p>
                 </div>
@@ -126,12 +137,66 @@
 </div>
 {% endif %}
 
+<!-- Add Manual Script Modal -->
+<div class="modal fade" id="addManualScriptModal" tabindex="-1" aria-labelledby="addManualScriptModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addManualScriptModalLabel">
+                    <i class="bi bi-plus-circle me-2"></i>Add Manual Script
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="manualScriptForm">
+                    <div class="mb-3">
+                        <label for="scriptTitle" class="form-label">Title <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="scriptTitle" required placeholder="Enter script title">
+                    </div>
+                    <div class="mb-3">
+                        <label for="scriptContent" class="form-label">Script Content <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="scriptContent" rows="10" required placeholder="Enter the main script content"></textarea>
+                        <div class="form-text">Word count: <span id="wordCount">0</span></div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="scriptHook" class="form-label">Hook (Optional)</label>
+                            <textarea class="form-control" id="scriptHook" rows="3" placeholder="Opening hook"></textarea>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="scriptCta" class="form-label">Call to Action (Optional)</label>
+                            <textarea class="form-control" id="scriptCta" rows="3" placeholder="Call to action"></textarea>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="scriptNotes" class="form-label">Speaker Notes (Optional)</label>
+                        <textarea class="form-control" id="scriptNotes" rows="3" placeholder="Additional notes for the speaker"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitManualScript()">
+                    <i class="bi bi-check-circle me-2"></i>Add Script
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
 const personaId = '{{ persona_id }}';
 const scriptsData = {{ scripts|tojson }};
+
+// Update word count as user types
+document.getElementById('scriptContent')?.addEventListener('input', function() {
+    const text = this.value.trim();
+    const wordCount = text ? text.split(/\s+/).length : 0;
+    document.getElementById('wordCount').textContent = wordCount;
+});
 
 function changePersona(newPersonaId) {
     window.location.href = `/scripts/${newPersonaId}?status={{ status }}&view={{ view }}`;
@@ -157,6 +222,54 @@ function updateScriptStatus(index, status) {
         } else {
             alert('Failed to update script status');
         }
+    });
+}
+
+function submitManualScript() {
+    const title = document.getElementById('scriptTitle').value.trim();
+    const content = document.getElementById('scriptContent').value.trim();
+    const hook = document.getElementById('scriptHook').value.trim();
+    const cta = document.getElementById('scriptCta').value.trim();
+    const notes = document.getElementById('scriptNotes').value.trim();
+    
+    if (!title || !content) {
+        alert('Please fill in the required fields (Title and Content)');
+        return;
+    }
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Adding...';
+    
+    fetch('/api/scripts/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            persona_id: personaId,
+            title: title,
+            content: content,
+            hook: hook,
+            cta: cta,
+            speaker_notes: notes
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal and reload page
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addManualScriptModal'));
+            modal.hide();
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to add manual script'));
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Add Script';
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error.message);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Add Script';
     });
 }
 </script>

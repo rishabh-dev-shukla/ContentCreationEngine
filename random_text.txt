@@ -1,2 +1,29 @@
-I have created a new folder 'video_gen' in my project 'ContentCreationEngine' that contains code for generating videos using AI. 
-The folder includes three files: 'math_ai_video_generator.py', 'demo_automated_video.py', and 'process_video.py'.
+ok, my SAT prep app Educado AI is live on Google Playstore and soon on Apple App Store! 🎉
+
+So, I am planning the complete Markeing Strategy for the launch (first month) and would love to get your inputs on it.
+Help me with finding out the best marketing channels to promote the app, target audience.
+I already have a good video creation team onboard to create promotional videos for the app.
+Right now, we have Instagram Page of Educado AI (and also FB page), and we will be continuing posting there
+We will also think of running ads on Instagram and FB. 
+Initially we will try to create a stronger hold in bangalore and then expand to other cities, so target audience would be students in Bangalore who are preparing for SAT.
+
+I want to also know about other platforms that I can target, my audeince is mostly teenagers (15-18 years old) and their parents.
+I want to know about Google Ads, YouTube ads. 
+Linkedin
+X (formerly Twitter)
+Reddit
+Quora
+Pinterest
+Snapchat
+Tiktok
+
+Some other platforms like Mygate (app for gated communities, it allows ads) and similar apps.
+There are some other channles like AdonMo (which has displays in societies and shows ads on screens in apartments, gyms etc)
+
+What other platforms should I target for my app launch marketing? whichever allow ads and have good reach to teenagers and their parents.
+
+Do a good research on these platforms, get me insights on each platform, how effective they are for app marketing, cost involved, targeting options available etc.
+
+
+I want to give a Weekend homework to my team mates to get active on social medias:
+

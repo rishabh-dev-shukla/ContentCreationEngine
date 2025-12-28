@@ -1122,6 +1122,39 @@ def api_update_idea(persona_id, filename, idea_index):
 @login_required
 def api_update_script(persona_id, filename, script_index):
     """API: Update a specific script."""
+    customer_id = get_current_customer_id()
+    
+    # Try Firebase first if customer is logged in
+    if customer_id:
+        from src.content_creation_engine.utils.firebase_service import get_firebase_service
+        firebase = get_firebase_service()
+        if firebase:
+            try:
+                output_id = filename.replace('.json', '') if filename.endswith('.json') else filename
+                data = request.json
+                
+                # Update the script using Firebase
+                success = firebase.update_script_status(
+                    customer_id=customer_id,
+                    persona_id=persona_id,
+                    output_id=output_id,
+                    script_index=script_index,
+                    status=data.get('status', 'pending'),
+                    additional_data={k: v for k, v in data.items() if k != 'status'}
+                )
+                
+                if success:
+                    # Clear cache
+                    cache.delete(f'content_list_{customer_id}_all')
+                    cache.delete(f'content_list_{customer_id}_{persona_id}')
+                    cache.delete(f'dashboard_stats_{customer_id}')
+                    return jsonify({'success': True})
+                else:
+                    return jsonify({'error': 'Failed to update script'}), 500
+            except Exception as e:
+                logger.error(f"Error updating script via Firebase: {e}")
+    
+    # Fallback to local file
     file_path = settings.output_dir / persona_id / filename
     
     if not file_path.exists():
@@ -1155,6 +1188,88 @@ def api_update_script(persona_id, filename, script_index):
         
         return jsonify({'success': True})
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scripts/manual', methods=['POST'])
+@login_required
+def api_add_manual_script():
+    """API: Add a manual script."""
+    customer_id = get_current_customer_id()
+    data = request.json
+    
+    persona_id = data.get('persona_id')
+    if not persona_id:
+        return jsonify({'error': 'persona_id is required'}), 400
+    
+    script_data = {
+        'title': data.get('title', 'Untitled Manual Script'),
+        'full_script': data.get('content', ''),
+        'main_content': data.get('content', ''),
+        'hook': data.get('hook', ''),
+        'cta': data.get('cta', ''),
+        'speaker_notes': data.get('speaker_notes', ''),
+        'idea_title': data.get('title', 'Manual Script'),
+        'word_count': len(data.get('content', '').split()),
+        'status': 'pending'
+    }
+    
+    # Use Firebase if customer is logged in
+    if customer_id:
+        from src.content_creation_engine.utils.firebase_service import get_firebase_service
+        firebase = get_firebase_service()
+        if firebase:
+            try:
+                output_id = firebase.add_manual_script(customer_id, persona_id, script_data)
+                if output_id:
+                    # Clear cache
+                    cache.delete(f'content_list_{customer_id}_all')
+                    cache.delete(f'content_list_{customer_id}_{persona_id}')
+                    cache.delete(f'dashboard_stats_{customer_id}')
+                    return jsonify({'success': True, 'output_id': output_id})
+                else:
+                    return jsonify({'error': 'Failed to add manual script'}), 500
+            except Exception as e:
+                logger.error(f"Error adding manual script via Firebase: {e}")
+                return jsonify({'error': str(e)}), 500
+    
+    # Fallback to local file
+    try:
+        # Create manual output file
+        output_dir = settings.output_dir / persona_id
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        filename = f"manual_{datetime.now().strftime('%Y-%m-%d')}.json"
+        file_path = output_dir / filename
+        
+        # Load existing manual content or create new
+        if file_path.exists():
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = json.load(f)
+        else:
+            content = {
+                'persona_id': persona_id,
+                'date': datetime.now().strftime('%Y-%m-%d'),
+                'niche': 'Manual Content',
+                'is_manual': True,
+                'content_ideas': [],
+                'scripts': [],
+                'visuals': [],
+                'created_at': datetime.now().isoformat()
+            }
+        
+        # Add manual flag to script
+        script_data['is_manual'] = True
+        script_data['created_at'] = datetime.now().isoformat()
+        
+        content['scripts'].append(script_data)
+        
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(content, f, indent=2, ensure_ascii=False)
+        
+        return jsonify({'success': True, 'filename': filename})
+    except Exception as e:
+        logger.error(f"Error adding manual script locally: {e}")
         return jsonify({'error': str(e)}), 500
 
 
