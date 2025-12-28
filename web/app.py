@@ -144,6 +144,7 @@ def get_persona_manager(customer_id: str = None):
 def get_all_content_outputs(persona_id: str = None) -> list:
     """Get all generated content outputs, optionally filtered by persona."""
     customer_id = get_current_customer_id()
+    logger.debug(f"get_all_content_outputs called: customer_id={customer_id}, persona_id={persona_id}")
     
     # If we have a customer context, use Firebase
     if customer_id:
@@ -151,6 +152,7 @@ def get_all_content_outputs(persona_id: str = None) -> list:
         cache_key = f'content_list_{customer_id}_{persona_id or "all"}'
         cached = cache.get(cache_key)
         if cached:
+            logger.debug(f"Returning {len(cached)} cached outputs")
             return cached
         
         from src.content_creation_engine.utils.firebase_service import get_firebase_service
@@ -162,6 +164,7 @@ def get_all_content_outputs(persona_id: str = None) -> list:
                     persona_id=persona_id,
                     limit=100
                 )
+                logger.info(f"Firebase returned {len(outputs)} outputs for {customer_id}/{persona_id or 'all'}")
                 # Cache for 2 minutes
                 cache.set(cache_key, outputs, timeout=120)
                 return outputs
@@ -411,13 +414,17 @@ def scripts_page(persona_id=None):
     scripts = []
     if persona_id:
         outputs = get_all_content_outputs(persona_id=persona_id)
+        logger.info(f"scripts_page: Got {len(outputs)} outputs for {persona_id}")
         for content in outputs:
             filename = content.get("_filename")
-            for idx, script in enumerate(content.get("scripts", [])):
+            content_scripts = content.get("scripts", [])
+            logger.debug(f"Output {filename}: {len(content_scripts)} scripts")
+            for idx, script in enumerate(content_scripts):
                 s = dict(script)
                 s["filename"] = filename
                 s["index"] = idx
                 scripts.append(s)
+        logger.info(f"scripts_page: Total {len(scripts)} scripts found")
         # Filter by status
         if status in ("approved", "rejected"):
             scripts = [s for s in scripts if s.get("status") == status]
@@ -1021,6 +1028,9 @@ def api_insights_status(job_id):
 # Global state for insights-to-content jobs
 insights_content_jobs = {}
 
+# Global state for research-to-content jobs  
+research_content_jobs = {}
+
 
 @app.route('/api/insights/generate-content', methods=['POST'])
 @login_required
@@ -1041,6 +1051,7 @@ def api_generate_content_from_insights():
     
     ideas_count = data.get('ideas_count', 5)
     generate_scripts = data.get('generate_scripts', True)
+    extra_instructions = data.get('extra_instructions', '')
     
     # Capture customer_id before starting thread (must be done in request context)
     customer_id = get_current_customer_id()
@@ -1077,7 +1088,8 @@ def api_generate_content_from_insights():
                 selected_insights=selected_insights,
                 persona=persona,
                 ideas_count=ideas_count,
-                generate_scripts=generate_scripts
+                generate_scripts=generate_scripts,
+                extra_instructions=extra_instructions
             )
             
             insights_content_jobs[job_id]['message'] = 'Saving generated content...'
@@ -1152,6 +1164,158 @@ def api_insights_content_status(job_id):
         return jsonify({'error': 'Job not found'}), 404
     
     return jsonify(insights_content_jobs[job_id])
+
+
+# =============================================================================
+# API - Research to Content Generation
+# =============================================================================
+
+@app.route('/api/research/generate-content', methods=['POST'])
+@login_required
+def api_generate_content_from_research():
+    """API: Generate content from selected research data."""
+    from src.content_creation_engine.generators import ResearchContentGenerator
+    
+    data = request.json
+    
+    persona_id = data.get('persona_id')
+    if not persona_id:
+        return jsonify({'error': 'Missing persona_id'}), 400
+    
+    selected_research = data.get('selected_research', [])
+    if not selected_research:
+        return jsonify({'error': 'No research data selected'}), 400
+    
+    ideas_count = data.get('ideas_count', 5)
+    generate_scripts = data.get('generate_scripts', True)
+    extra_instructions = data.get('extra_instructions', '')
+    
+    # Capture customer_id before starting thread (must be done in request context)
+    customer_id = get_current_customer_id()
+    
+    # Load persona now while we're still in request context
+    try:
+        manager = get_persona_manager(customer_id=customer_id)
+        persona = manager.load_persona(persona_id)
+        if not persona:
+            return jsonify({'error': f'Persona {persona_id} not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error loading persona: {str(e)}'}), 500
+    
+    # Create a unique job ID
+    job_id = f"research_content_{persona_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
+    # Mark job as running
+    research_content_jobs[job_id] = {
+        'status': 'running',
+        'persona_id': persona_id,
+        'started_at': datetime.now().isoformat(),
+        'progress': 0,
+        'message': 'Starting content generation from research...',
+        'research_count': len(selected_research)
+    }
+    
+    def run_generation():
+        try:
+            research_content_jobs[job_id]['message'] = 'Analyzing research data...'
+            research_content_jobs[job_id]['progress'] = 10
+            
+            research_content_jobs[job_id]['message'] = 'Generating content ideas...'
+            research_content_jobs[job_id]['progress'] = 20
+            
+            generator = ResearchContentGenerator()
+            result = generator.generate_content_from_research(
+                selected_research=selected_research,
+                persona=persona,
+                ideas_count=ideas_count,
+                generate_scripts=generate_scripts,
+                extra_instructions=extra_instructions
+            )
+            
+            logger.info(f"Research content generated: {len(result.get('content_ideas', []))} ideas, {len(result.get('scripts', []))} scripts")
+            
+            research_content_jobs[job_id]['message'] = 'Saving generated content...'
+            research_content_jobs[job_id]['progress'] = 90
+            
+            # Generate output ID
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            output_id = f"{timestamp}_research_content"
+            
+            # Add metadata to result for consistency with regular content
+            result['date'] = datetime.now().strftime("%Y-%m-%d")
+            result['niche'] = persona.get('basic_info', {}).get('niche', '')
+            
+            # Log result structure for debugging
+            logger.info(f"Result structure: date={result.get('date')}, source={result.get('source')}, scripts={len(result.get('scripts', []))}")
+            if result.get('scripts'):
+                first_script = result['scripts'][0]
+                logger.info(f"First script keys: {list(first_script.keys())}")
+                logger.info(f"First script source: {first_script.get('source')}, has full_script: {'full_script' in first_script}")
+            
+            # Save to Firebase if customer is logged in
+            if customer_id:
+                try:
+                    from src.content_creation_engine.utils.firebase_service import get_firebase_service
+                    firebase = get_firebase_service()
+                    logger.info(f"Firebase service obtained: {firebase is not None}")
+                    if firebase:
+                        saved_id = firebase.save_content_output(
+                            customer_id=customer_id,
+                            persona_id=persona_id,
+                            content=result,
+                            output_id=output_id
+                        )
+                        logger.info(f"Research content saved to Firebase: {customer_id}/{persona_id}/{saved_id}")
+                    else:
+                        logger.warning("Firebase service is None, content not saved to database")
+                except Exception as e:
+                    logger.error(f"Error saving to Firebase: {e}", exc_info=True)
+            
+            # Also save to local file as backup
+            output_dir = settings.output_dir / persona_id
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            filename = f"{output_id}.json"
+            output_file = output_dir / filename
+            
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(result, f, indent=2, ensure_ascii=False)
+            
+            research_content_jobs[job_id]['status'] = 'completed'
+            research_content_jobs[job_id]['progress'] = 100
+            research_content_jobs[job_id]['message'] = 'Content generation from research completed!'
+            research_content_jobs[job_id]['result'] = {
+                'ideas_count': len(result.get('content_ideas', [])),
+                'scripts_count': len(result.get('scripts', [])),
+                'output_file': str(output_file),
+                'filename': output_id  # Return without .json for URL consistency
+            }
+            
+            # Clear cache (using customer_id captured before thread started)
+            if customer_id:
+                cache.delete(f'content_list_{customer_id}_all')
+                cache.delete(f'content_list_{customer_id}_{persona_id}')
+            
+        except Exception as e:
+            logger.error(f"Research content generation error: {e}")
+            research_content_jobs[job_id]['status'] = 'failed'
+            research_content_jobs[job_id]['message'] = str(e)
+    
+    # Run in background thread
+    thread = Thread(target=run_generation)
+    thread.start()
+    
+    return jsonify({'job_id': job_id, 'status': 'started'})
+
+
+@app.route('/api/research/generate-content/<job_id>/status', methods=['GET'])
+@login_required
+def api_research_content_status(job_id):
+    """API: Get research content generation job status."""
+    if job_id not in research_content_jobs:
+        return jsonify({'error': 'Job not found'}), 404
+    
+    return jsonify(research_content_jobs[job_id])
 
 
 @app.route('/api/insights', methods=['GET'])

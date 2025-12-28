@@ -194,7 +194,7 @@
                         {% endif %}
                         
                         <div class="bg-light p-3 rounded">
-                            <pre class="mb-0" style="white-space: pre-wrap;">{{ script.full_script if script.full_script else script.main_content if script.main_content else script.script if script.script else script.content if script.content else 'No script content' }}</pre>
+                            <pre class="mb-0" style="white-space: pre-wrap;">{{ script.full_script if script.full_script else script.script_body if script.script_body else script.main_content if script.main_content else script.script if script.script else script.content if script.content else 'No script content' }}</pre>
                         </div>
                         
                         {% if script.cta %}

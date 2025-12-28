@@ -45,7 +45,8 @@ class InsightsContentGenerator:
         selected_insights: List[Dict[str, Any]],
         persona: Dict[str, Any],
         ideas_count: int = 5,
-        generate_scripts: bool = True
+        generate_scripts: bool = True,
+        extra_instructions: str = ""
     ) -> Dict[str, Any]:
         """
         Generate content ideas and scripts from selected insights.
@@ -60,6 +61,7 @@ class InsightsContentGenerator:
             persona: Persona dictionary with style guide and preferences
             ideas_count: Number of ideas to generate
             generate_scripts: Whether to also generate full scripts
+            extra_instructions: Optional extra instructions for content generation
             
         Returns:
             Dictionary containing generated ideas and optionally scripts
@@ -77,7 +79,8 @@ class InsightsContentGenerator:
             target_audience=basic_info.get("target_audience", "general audience"),
             tone=basic_info.get("tone", "engaging"),
             style_guide=style_guide,
-            ideas_count=ideas_count
+            ideas_count=ideas_count,
+            extra_instructions=extra_instructions
         )
         
         logger.info(f"Generating {ideas_count} content ideas from {len(selected_insights)} selected insights")
@@ -96,13 +99,14 @@ class InsightsContentGenerator:
             "persona_id": persona.get("persona_id", "unknown"),
             "source": "insights",
             "selected_insights_count": len(selected_insights),
+            "extra_instructions": extra_instructions if extra_instructions else None,
             "content_ideas": ideas,
             "scripts": []
         }
         
         # Generate scripts if requested
         if generate_scripts and ideas:
-            scripts = self._generate_scripts_for_ideas(ideas, persona)
+            scripts = self._generate_scripts_for_ideas(ideas, persona, extra_instructions)
             result["scripts"] = scripts
         
         return result
@@ -224,7 +228,8 @@ class InsightsContentGenerator:
         target_audience: str,
         tone: str,
         style_guide: Dict[str, Any],
-        ideas_count: int
+        ideas_count: int,
+        extra_instructions: str = ""
     ) -> str:
         """Build the content generation prompt."""
         
@@ -233,6 +238,15 @@ class InsightsContentGenerator:
         cta_style = style_guide.get("cta_style", "Save and share focused")
         avoid_list = style_guide.get("avoid", [])
         avoid_str = ", ".join(avoid_list) if avoid_list else "None specified"
+        
+        extra_section = ""
+        if extra_instructions:
+            extra_section = f"""
+# EXTRA INSTRUCTIONS FROM USER
+{extra_instructions}
+
+Please incorporate these instructions when generating the content ideas.
+"""
         
         prompt = f"""Based on the following research insights, generate {ideas_count} highly engaging Instagram Reel content ideas.
 
@@ -249,7 +263,7 @@ Tone: {tone}
 
 # SELECTED INSIGHTS TO USE
 {insights_context}
-
+{extra_section}
 # YOUR TASK
 Create {ideas_count} unique, viral-worthy content ideas that directly address the insights above. Each idea should:
 1. Be based on one or more of the provided insights
@@ -329,7 +343,8 @@ Return ONLY the JSON array, no other text."""
     def _generate_scripts_for_ideas(
         self,
         ideas: List[Dict[str, Any]],
-        persona: Dict[str, Any]
+        persona: Dict[str, Any],
+        extra_instructions: str = ""
     ) -> List[Dict[str, Any]]:
         """Generate full scripts for the generated ideas."""
         basic_info = persona.get("basic_info", {})
@@ -340,7 +355,7 @@ Return ONLY the JSON array, no other text."""
         for idx, idea in enumerate(ideas):
             logger.info(f"Generating script {idx + 1}/{len(ideas)}: {idea.get('title', 'Untitled')}")
             
-            script_prompt = self._build_script_prompt(idea, basic_info, style_guide)
+            script_prompt = self._build_script_prompt(idea, basic_info, style_guide, extra_instructions)
             
             try:
                 script_response = self.ai_client.generate(
@@ -368,13 +383,18 @@ Return ONLY the JSON array, no other text."""
         self,
         idea: Dict[str, Any],
         basic_info: Dict[str, Any],
-        style_guide: Dict[str, Any]
+        style_guide: Dict[str, Any],
+        extra_instructions: str = ""
     ) -> str:
         """Build the script generation prompt."""
         
         tone = basic_info.get("tone", "engaging")
         avoid_list = style_guide.get("avoid", [])
         avoid_str = ", ".join(avoid_list) if avoid_list else "None"
+        
+        extra_section = ""
+        if extra_instructions:
+            extra_section = f"\n\n# EXTRA INSTRUCTIONS\n{extra_instructions}"
         
         key_points = idea.get("key_points", [])
         key_points_str = "\n".join([f"  - {p}" for p in key_points]) if key_points else "  - Not specified"
@@ -383,7 +403,7 @@ Return ONLY the JSON array, no other text."""
 
 # CONTENT IDEA
 Title: {idea.get('title', 'Untitled')}
-Hook: {idea.get('hook', '')}
+Hook: {idea.get('hook', '')}{extra_section}
 Concept: {idea.get('concept', '')}
 Key Points:
 {key_points_str}
@@ -444,6 +464,23 @@ Return ONLY the JSON object, no other text."""
             script["source"] = "insights"
             script["status"] = "pending"
             script["created_at"] = datetime.now().isoformat()
+            
+            # Normalize field names to match template expectations
+            if "script_body" in script and "full_script" not in script:
+                script["full_script"] = script.pop("script_body")
+            if "call_to_action" in script and "cta" not in script:
+                script["cta"] = script.pop("call_to_action")
+            if "estimated_duration" in script and "estimated_duration_seconds" not in script:
+                script["estimated_duration_seconds"] = script.pop("estimated_duration")
+            
+            # Calculate word count
+            if script.get("full_script"):
+                script["word_count"] = len(script["full_script"].split())
+            elif script.get("main_content"):
+                content = script["main_content"]
+                if isinstance(content, list):
+                    content = " ".join(content)
+                script["word_count"] = len(str(content).split())
             
             return script
             

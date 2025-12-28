@@ -5,11 +5,36 @@
 {% block content %}
 <div class="row mb-4">
     <div class="col">
-        <h1>
-            <i class="bi bi-search text-primary me-2"></i>
-            Research Data
-        </h1>
-        <p class="text-muted">View all research data collected from various APIs</p>
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h1>
+                    <i class="bi bi-search text-primary me-2"></i>
+                    Research Data
+                </h1>
+                <p class="text-muted">View research data collected from various APIs and generate content from it</p>
+            </div>
+            <!-- Generate Content Button -->
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnSelectAll">
+                    <i class="bi bi-check-all me-1"></i>Select All
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="btnDeselectAll">
+                    <i class="bi bi-x-circle me-1"></i>Deselect All
+                </button>
+                <span id="selectedCount" class="badge bg-info d-none">0 selected</span>
+                <button type="button" class="btn btn-success btn-lg" id="btnGenerateContent" disabled>
+                    <i class="bi bi-magic me-2"></i>Generate Content
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Selection Instructions -->
+<div class="alert alert-info d-flex align-items-center mb-4" id="selectionHint">
+    <i class="bi bi-info-circle me-2"></i>
+    <div>
+        <strong>Tip:</strong> Select research items by clicking on rows or checkboxes, then click "Generate Content" to create content ideas based on the selected data.
     </div>
 </div>
 
@@ -95,6 +120,7 @@
                         <table class="table table-hover table-striped">
                             <thead>
                                 <tr>
+                                    <th style="width: 40px;"><input type="checkbox" class="form-check-input select-all-source" data-source="{{ source }}" data-entry="{{ entry_id }}" title="Select all {{ source }}"></th>
                                     <th>#</th>
                                     <th>Title</th>
                                     <th>Source</th>
@@ -109,7 +135,12 @@
                             </thead>
                             <tbody>
                                 {% for item in entry.data[source] %}
-                                <tr>
+                                <tr class="selectable-research-row" 
+                                    data-source="{{ source }}" 
+                                    data-content='{{ item|tojson|e }}'>
+                                    <td>
+                                        <input type="checkbox" class="form-check-input research-checkbox" title="Select this item">
+                                    </td>
                                     <td>{{ loop.index }}</td>
                                     <td>
                                         <strong>{{ item.title if item.title else item.get('headline', 'Untitled') }}</strong>
@@ -173,9 +204,16 @@
                     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
                         {% for item in entry.data[source] %}
                         <div class="col">
-                            <div class="card h-100">
+                            <div class="card h-100 selectable-research-card" 
+                                 data-source="{{ source }}" 
+                                 data-content='{{ item|tojson|e }}'>
                                 <div class="card-body">
-                                    <h6 class="card-title">{{ item.title if item.title else item.get('headline', 'Untitled') }}</h6>
+                                    <div class="form-check mb-2">
+                                        <input type="checkbox" class="form-check-input research-checkbox" title="Select this item">
+                                        <label class="form-check-label">
+                                            <h6 class="card-title mb-0">{{ item.title if item.title else item.get('headline', 'Untitled') }}</h6>
+                                        </label>
+                                    </div>
                                     {% if item.summary %}
                                     <p class="card-text small text-muted">{{ item.summary[:150] }}...</p>
                                     {% endif %}
@@ -186,7 +224,7 @@
                                         <span class="badge bg-warning">r/{{ item.subreddit }}</span>
                                         {% endif %}
                                         {% if item.url %}
-                                        <a href="{{ item.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <a href="{{ item.url }}" target="_blank" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();">
                                             <i class="bi bi-box-arrow-up-right"></i>
                                         </a>
                                         {% endif %}
@@ -228,6 +266,103 @@
     </div>
 </div>
 {% endfor %}
+
+<!-- Generate Content Modal -->
+<div class="modal fade" id="generateContentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-magic me-2"></i>Generate Content from Research</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Configuration Form -->
+                <div id="configForm">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        You have selected <strong id="modalSelectedCount">0</strong> research items to generate content from.
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Select Persona</label>
+                            <select class="form-select" id="personaSelect" required>
+                                <option value="">-- Select Persona --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Number of Ideas</label>
+                            <select class="form-select" id="ideasCount">
+                                <option value="3">3 Ideas</option>
+                                <option value="5" selected>5 Ideas</option>
+                                <option value="7">7 Ideas</option>
+                                <option value="10">10 Ideas</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="generateScripts" checked>
+                                <label class="form-check-label" for="generateScripts">
+                                    Also generate full scripts for each idea
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label class="form-label">Extra Instructions (Optional)</label>
+                            <textarea class="form-control" id="extraInstructions" rows="3" 
+                                placeholder="Add any specific instructions for content generation, e.g., 'Focus on beginner-friendly content' or 'Make it more humorous'"></textarea>
+                            <div class="form-text">These instructions will guide the AI when generating content ideas and scripts.</div>
+                        </div>
+                    </div>
+                    
+                    <h6 class="mt-4 mb-3">Selected Research Preview:</h6>
+                    <div id="selectedResearchPreview" class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Progress Section (hidden by default) -->
+                <div id="progressSection" class="d-none">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-success mb-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h5 id="progressMessage">Generating content...</h5>
+                        <div class="progress mt-3" style="height: 25px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                 id="progressBar" role="progressbar" aria-label="Generation progress" style="width: 0%">0%</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Result Section (hidden by default) -->
+                <div id="resultSection" class="d-none">
+                    <div class="text-center py-4">
+                        <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+                        <h4 class="mt-3">Content Generated Successfully!</h4>
+                        <p class="text-muted" id="resultSummary"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="btnStartGeneration">
+                    <i class="bi bi-lightning-charge me-1"></i>Generate Content
+                </button>
+                <a href="#" class="btn btn-primary d-none" id="btnViewContent">
+                    <i class="bi bi-eye me-1"></i>View Generated Content
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% else %}
 <div class="text-center py-5">
     <i class="bi bi-search fs-1 text-muted"></i>
@@ -241,16 +376,363 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-// Toggle between table and tile views
-document.getElementById('tableView').addEventListener('change', function() {
-    document.querySelectorAll('.view-table').forEach(el => el.classList.remove('d-none'));
-    document.querySelectorAll('.view-tiles').forEach(el => el.classList.add('d-none'));
-});
+<style>
+    .selectable-research-row {
+        cursor: pointer;
+    }
+    .selectable-research-row:hover {
+        background-color: rgba(25, 135, 84, 0.1) !important;
+    }
+    .selectable-research-row.selected {
+        background-color: rgba(25, 135, 84, 0.15) !important;
+    }
+    .selectable-research-card {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .selectable-research-card:hover {
+        border-color: #198754 !important;
+        box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.15);
+    }
+    .selectable-research-card.selected {
+        border-color: #198754 !important;
+        border-width: 2px;
+        background-color: rgba(25, 135, 84, 0.05);
+    }
+    .research-checkbox {
+        transform: scale(1.2);
+    }
+    #selectedResearchPreview .research-tag {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        margin: 0.25rem;
+        background-color: #e9ecef;
+        border-radius: 0.25rem;
+        font-size: 0.875rem;
+    }
+    #selectedResearchPreview .research-tag .source-badge {
+        font-size: 0.75rem;
+        margin-right: 0.25rem;
+    }
+</style>
 
-document.getElementById('tileView').addEventListener('change', function() {
-    document.querySelectorAll('.view-table').forEach(el => el.classList.add('d-none'));
-    document.querySelectorAll('.view-tiles').forEach(el => el.classList.remove('d-none'));
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let selectedResearch = [];
+    
+    // DOM elements
+    const btnGenerateContent = document.getElementById('btnGenerateContent');
+    const selectedCountBadge = document.getElementById('selectedCount');
+    const btnSelectAll = document.getElementById('btnSelectAll');
+    const btnDeselectAll = document.getElementById('btnDeselectAll');
+    const modal = new bootstrap.Modal(document.getElementById('generateContentModal'));
+    const modalSelectedCount = document.getElementById('modalSelectedCount');
+    const selectedResearchPreview = document.getElementById('selectedResearchPreview');
+    const configForm = document.getElementById('configForm');
+    const progressSection = document.getElementById('progressSection');
+    const resultSection = document.getElementById('resultSection');
+    const btnStartGeneration = document.getElementById('btnStartGeneration');
+    const btnViewContent = document.getElementById('btnViewContent');
+    const personaSelect = document.getElementById('personaSelect');
+    
+    // Load personas
+    fetch('/api/personas')
+        .then(res => res.json())
+        .then(data => {
+            data.personas.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.persona_id;
+                option.textContent = `${p.name} (${p.niche})`;
+                personaSelect.appendChild(option);
+            });
+        });
+    
+    // Toggle between table and tile views
+    document.getElementById('tableView').addEventListener('change', function() {
+        document.querySelectorAll('.view-table').forEach(el => el.classList.remove('d-none'));
+        document.querySelectorAll('.view-tiles').forEach(el => el.classList.add('d-none'));
+    });
+
+    document.getElementById('tileView').addEventListener('change', function() {
+        document.querySelectorAll('.view-table').forEach(el => el.classList.add('d-none'));
+        document.querySelectorAll('.view-tiles').forEach(el => el.classList.remove('d-none'));
+    });
+    
+    // Select All button (visible items)
+    btnSelectAll.addEventListener('click', function() {
+        document.querySelectorAll('.research-checkbox:not(:checked)').forEach(checkbox => {
+            checkbox.checked = true;
+            const parent = checkbox.closest('.selectable-research-row, .selectable-research-card');
+            if (parent) {
+                updateResearchSelection(parent, true);
+            }
+        });
+        updateSelectButtons();
+    });
+    
+    // Deselect All button
+    btnDeselectAll.addEventListener('click', function() {
+        document.querySelectorAll('.research-checkbox:checked').forEach(checkbox => {
+            checkbox.checked = false;
+            const parent = checkbox.closest('.selectable-research-row, .selectable-research-card');
+            if (parent) {
+                parent.classList.remove('selected');
+            }
+        });
+        selectedResearch = [];
+        updateUI();
+        updateSelectButtons();
+    });
+    
+    function updateSelectButtons() {
+        const hasSelections = selectedResearch.length > 0;
+        if (hasSelections) {
+            btnSelectAll.classList.add('d-none');
+            btnDeselectAll.classList.remove('d-none');
+        } else {
+            btnSelectAll.classList.remove('d-none');
+            btnDeselectAll.classList.add('d-none');
+        }
+    }
+    
+    // Handle checkbox changes
+    document.querySelectorAll('.research-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function(e) {
+            e.stopPropagation();
+            const parent = this.closest('.selectable-research-row, .selectable-research-card');
+            if (parent) {
+                updateResearchSelection(parent, this.checked);
+            }
+            updateSelectButtons();
+        });
+    });
+    
+    // Handle row/card clicks
+    document.querySelectorAll('.selectable-research-row, .selectable-research-card').forEach(element => {
+        element.addEventListener('click', function(e) {
+            // Don't toggle if clicking on checkbox or link
+            if (e.target.classList.contains('research-checkbox') || e.target.closest('a')) return;
+            
+            const checkbox = this.querySelector('.research-checkbox');
+            if (checkbox) {
+                checkbox.checked = !checkbox.checked;
+                updateResearchSelection(this, checkbox.checked);
+                updateSelectButtons();
+            }
+        });
+    });
+    
+    // Handle "Select all" checkbox in table header
+    document.querySelectorAll('.select-all-source').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const source = this.dataset.source;
+            const entryId = this.dataset.entry;
+            const isChecked = this.checked;
+            
+            // Find all rows in this source's table
+            const pane = document.getElementById(`pane${entryId}_${source}`);
+            if (pane) {
+                pane.querySelectorAll('.selectable-research-row').forEach(row => {
+                    const rowCheckbox = row.querySelector('.research-checkbox');
+                    if (rowCheckbox && rowCheckbox.checked !== isChecked) {
+                        rowCheckbox.checked = isChecked;
+                        updateResearchSelection(row, isChecked);
+                    }
+                });
+            }
+            updateSelectButtons();
+        });
+    });
+    
+    function updateResearchSelection(element, isSelected) {
+        const source = element.dataset.source;
+        let content;
+        
+        try {
+            content = JSON.parse(element.dataset.content);
+        } catch (e) {
+            content = element.dataset.content;
+        }
+        
+        if (isSelected) {
+            element.classList.add('selected');
+            selectedResearch.push({
+                source: source,
+                content: content
+            });
+        } else {
+            element.classList.remove('selected');
+            // Remove from selected
+            selectedResearch = selectedResearch.filter(r => {
+                const contentStr = JSON.stringify(r.content);
+                const itemContentStr = JSON.stringify(content);
+                return contentStr !== itemContentStr;
+            });
+        }
+        
+        updateUI();
+    }
+    
+    function updateUI() {
+        const count = selectedResearch.length;
+        
+        // Update count badge
+        if (count > 0) {
+            selectedCountBadge.textContent = count + ' selected';
+            selectedCountBadge.classList.remove('d-none');
+            btnGenerateContent.disabled = false;
+        } else {
+            selectedCountBadge.classList.add('d-none');
+            btnGenerateContent.disabled = true;
+        }
+    }
+    
+    // Open modal
+    btnGenerateContent.addEventListener('click', function() {
+        modalSelectedCount.textContent = selectedResearch.length;
+        
+        // Build preview
+        selectedResearchPreview.innerHTML = '';
+        
+        // Group by source for display
+        const bySource = {};
+        selectedResearch.forEach(item => {
+            if (!bySource[item.source]) bySource[item.source] = [];
+            bySource[item.source].push(item.content);
+        });
+        
+        for (const [source, items] of Object.entries(bySource)) {
+            const sourceDiv = document.createElement('div');
+            sourceDiv.className = 'mb-2';
+            sourceDiv.innerHTML = `<strong class="text-capitalize">${source}</strong> (${items.length} items):`;
+            
+            items.slice(0, 3).forEach(item => {
+                const tag = document.createElement('div');
+                tag.className = 'research-tag';
+                const title = item.title || item.headline || 'Untitled';
+                tag.innerHTML = `<span class="source-badge badge bg-secondary">${source}</span> ${title.substring(0, 40)}${title.length > 40 ? '...' : ''}`;
+                sourceDiv.appendChild(tag);
+            });
+            
+            if (items.length > 3) {
+                const moreTag = document.createElement('div');
+                moreTag.className = 'research-tag text-muted';
+                moreTag.textContent = `+${items.length - 3} more`;
+                sourceDiv.appendChild(moreTag);
+            }
+            
+            selectedResearchPreview.appendChild(sourceDiv);
+        }
+        
+        // Reset modal state
+        configForm.classList.remove('d-none');
+        progressSection.classList.add('d-none');
+        resultSection.classList.add('d-none');
+        btnStartGeneration.classList.remove('d-none');
+        btnStartGeneration.disabled = false;
+        btnViewContent.classList.add('d-none');
+        
+        modal.show();
+    });
+    
+    // Start generation
+    btnStartGeneration.addEventListener('click', async function() {
+        const personaId = personaSelect.value;
+        if (!personaId) {
+            alert('Please select a persona');
+            return;
+        }
+        
+        const ideasCount = parseInt(document.getElementById('ideasCount').value);
+        const generateScripts = document.getElementById('generateScripts').checked;
+        const extraInstructions = document.getElementById('extraInstructions').value.trim();
+        
+        // Show progress
+        configForm.classList.add('d-none');
+        progressSection.classList.remove('d-none');
+        btnStartGeneration.disabled = true;
+        
+        try {
+            // Start generation
+            const response = await fetch('/api/research/generate-content', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    persona_id: personaId,
+                    selected_research: selectedResearch,
+                    ideas_count: ideasCount,
+                    generate_scripts: generateScripts,
+                    extra_instructions: extraInstructions
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            // Poll for status
+            const jobId = data.job_id;
+            pollJobStatus(jobId, personaId);
+            
+        } catch (error) {
+            alert('Error starting generation: ' + error.message);
+            configForm.classList.remove('d-none');
+            progressSection.classList.add('d-none');
+            btnStartGeneration.disabled = false;
+        }
+    });
+    
+    async function pollJobStatus(jobId, personaId) {
+        const progressBar = document.getElementById('progressBar');
+        const progressMessage = document.getElementById('progressMessage');
+        
+        const poll = async () => {
+            try {
+                const response = await fetch(`/api/research/generate-content/${jobId}/status`);
+                const status = await response.json();
+                
+                if (status.error) {
+                    throw new Error(status.error);
+                }
+                
+                // Update progress
+                progressBar.style.width = status.progress + '%';
+                progressBar.textContent = status.progress + '%';
+                progressMessage.textContent = status.message;
+                
+                if (status.status === 'completed') {
+                    // Show result
+                    progressSection.classList.add('d-none');
+                    resultSection.classList.remove('d-none');
+                    btnStartGeneration.classList.add('d-none');
+                    btnViewContent.classList.remove('d-none');
+                    
+                    document.getElementById('resultSummary').textContent = 
+                        `Generated ${status.result.ideas_count} ideas and ${status.result.scripts_count} scripts`;
+                    
+                    btnViewContent.href = `/content/${personaId}/${status.result.filename}`;
+                    
+                } else if (status.status === 'failed') {
+                    throw new Error(status.message);
+                } else {
+                    // Continue polling
+                    setTimeout(poll, 1000);
+                }
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+                configForm.classList.remove('d-none');
+                progressSection.classList.add('d-none');
+                btnStartGeneration.disabled = false;
+            }
+        };
+        
+        poll();
+    }
 });
 </script>
 {% endblock %}

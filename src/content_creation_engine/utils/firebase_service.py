@@ -458,22 +458,40 @@ class FirebaseService:
                 # Get outputs for all personas
                 persona_ids = self.list_personas(customer_id)
             
+            logger.info(f"list_content_outputs: customer={customer_id}, persona_filter={persona_id}, found personas={persona_ids}")
+            
             for pid in persona_ids:
-                outputs_ref = (self.db.collection('customers')
-                              .document(customer_id)
-                              .collection('personas')
-                              .document(pid)
-                              .collection('outputs')
-                              .order_by('date', direction=firestore.Query.DESCENDING)
-                              .limit(limit))
+                try:
+                    # Try with order_by first
+                    outputs_ref = (self.db.collection('customers')
+                                  .document(customer_id)
+                                  .collection('personas')
+                                  .document(pid)
+                                  .collection('outputs')
+                                  .order_by('date', direction=firestore.Query.DESCENDING)
+                                  .limit(limit))
+                    
+                    docs = list(outputs_ref.get())
+                except Exception as order_err:
+                    # If order_by fails (missing index), get without ordering
+                    logger.warning(f"Order by date failed for {pid}, fetching unordered: {order_err}")
+                    outputs_ref = (self.db.collection('customers')
+                                  .document(customer_id)
+                                  .collection('personas')
+                                  .document(pid)
+                                  .collection('outputs')
+                                  .limit(limit))
+                    docs = list(outputs_ref.get())
                 
-                docs = outputs_ref.get()
+                logger.info(f"Persona {pid}: found {len(docs)} outputs")
+                
                 for doc in docs:
                     data = doc.to_dict()
                     data['_id'] = doc.id
                     data['_filename'] = doc.id
                     data['_persona_id'] = pid
                     outputs.append(data)
+                    logger.debug(f"Loaded output: {doc.id} for persona {pid}")
             
             # Sort by date descending
             outputs.sort(key=lambda x: x.get('date', ''), reverse=True)

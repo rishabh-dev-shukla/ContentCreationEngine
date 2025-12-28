@@ -821,6 +821,15 @@
                         </div>
                     </div>
                     
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <label class="form-label">Extra Instructions (Optional)</label>
+                            <textarea class="form-control" id="extraInstructions" rows="3" 
+                                placeholder="Add any specific instructions for content generation, e.g., 'Focus on beginner-friendly content' or 'Make it more humorous'"></textarea>
+                            <div class="form-text">These instructions will guide the AI when generating content ideas and scripts.</div>
+                        </div>
+                    </div>
+                    
                     <h6 class="mt-4 mb-3">Selected Insights Preview:</h6>
                     <div id="selectedInsightsPreview" class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
                         <!-- Will be populated by JavaScript -->
@@ -1087,6 +1096,7 @@ document.addEventListener('DOMContentLoaded', function() {
     btnStartGeneration.addEventListener('click', async function() {
         const ideasCount = parseInt(document.getElementById('ideasCount').value);
         const generateScripts = document.getElementById('generateScripts').checked;
+        const extraInstructions = document.getElementById('extraInstructions').value.trim();
         
         // Show progress
         configForm.classList.add('d-none');
@@ -1104,7 +1114,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     persona_id: personaId,
                     selected_insights: selectedInsights,
                     ideas_count: ideasCount,
-                    generate_scripts: generateScripts
+                    generate_scripts: generateScripts,
+                    extra_instructions: extraInstructions
                 })
             });
             

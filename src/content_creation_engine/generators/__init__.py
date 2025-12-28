@@ -5,6 +5,7 @@ from .script_writer import ScriptWriter
 from .visual_suggester import VisualSuggester
 from .insights_analyzer import InsightsAnalyzer
 from .insights_content_generator import InsightsContentGenerator, generate_content_from_insights
+from .research_content_generator import ResearchContentGenerator
 
 __all__ = [
     "IdeaGenerator", 
@@ -12,5 +13,6 @@ __all__ = [
     "VisualSuggester", 
     "InsightsAnalyzer",
     "InsightsContentGenerator",
-    "generate_content_from_insights"
+    "generate_content_from_insights",
+    "ResearchContentGenerator"
 ]

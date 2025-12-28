@@ -72,6 +72,8 @@
                         <span class="badge bg-info ms-2" title="Manually added"><i class="bi bi-pencil-square"></i> Manual</span>
                         {% elif script.source == 'insights' %}
                         <span class="badge bg-success ms-2" title="Generated from Insights"><i class="bi bi-lightbulb"></i> From Insights</span>
+                        {% elif script.source == 'research' %}
+                        <span class="badge bg-primary ms-2" title="Generated from Research"><i class="bi bi-search"></i> From Research</span>
                         {% endif %}
                     </td>
                     <td>
@@ -109,6 +111,8 @@
                         <span class="badge bg-info ms-2" title="Manually added"><i class="bi bi-pencil-square"></i> Manual</span>
                         {% elif script.source == 'insights' %}
                         <span class="badge bg-success ms-2" title="Generated from Insights"><i class="bi bi-lightbulb"></i> From Insights</span>
+                        {% elif script.source == 'research' %}
+                        <span class="badge bg-primary ms-2" title="Generated from Research"><i class="bi bi-search"></i> From Research</span>
                         {% endif %}
                     </h6>
                     <p class="card-text small text-muted">{{ (script.full_script or script.main_content or script.script or script.content or '')[:120] }}...</p>
