@@ -12,15 +12,40 @@
                 <li class="breadcrumb-item active">{{ insights.generated_at[:10] if insights.generated_at else 'Report' }}</li>
             </ol>
         </nav>
-        <h1>
-            <i class="bi bi-graph-up text-success me-2"></i>
-            Insights Report
-        </h1>
-        <p class="text-muted">
-            <span class="badge bg-primary me-2">{{ insights.persona_id }}</span>
-            <span class="badge bg-secondary me-2">{{ insights.niche }}</span>
-            Generated: {{ insights.generated_at[:19] if insights.generated_at else 'Unknown' }}
-        </p>
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h1>
+                    <i class="bi bi-graph-up text-success me-2"></i>
+                    Insights Report
+                </h1>
+                <p class="text-muted">
+                    <span class="badge bg-primary me-2">{{ insights.persona_id }}</span>
+                    <span class="badge bg-secondary me-2">{{ insights.niche }}</span>
+                    Generated: {{ insights.generated_at[:19] if insights.generated_at else 'Unknown' }}
+                </p>
+            </div>
+            <!-- Generate Content Button -->
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnSelectAll">
+                    <i class="bi bi-check-all me-1"></i>Select All
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="btnDeselectAll">
+                    <i class="bi bi-x-circle me-1"></i>Deselect All
+                </button>
+                <span id="selectedCount" class="badge bg-info d-none">0 selected</span>
+                <button type="button" class="btn btn-success btn-lg" id="btnGenerateContent" disabled>
+                    <i class="bi bi-magic me-2"></i>Generate Content from Insights
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Selection Instructions -->
+<div class="alert alert-info d-flex align-items-center mb-4" id="selectionHint">
+    <i class="bi bi-info-circle me-2"></i>
+    <div>
+        <strong>Tip:</strong> Click on insight cards to select them, then click "Generate Content from Insights" to create content ideas and scripts based on your selections.
     </div>
 </div>
 
@@ -106,10 +131,17 @@
                 <h5><i class="bi bi-fire text-danger me-2"></i>Top Trends</h5>
                 {% if data.top_trends %}
                 {% for trend in data.top_trends %}
-                <div class="card mb-3">
+                <div class="card mb-3 insight-card selectable-insight" 
+                     data-insight-type="trend" 
+                     data-insight-content='{{ trend|tojson|e }}'>
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start">
-                            <h6 class="card-title mb-1">{{ trend.topic }}</h6>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="trend_{{ loop.index }}">
+                                <label class="form-check-label">
+                                    <h6 class="card-title mb-1">{{ trend.topic }}</h6>
+                                </label>
+                            </div>
                             <span class="badge bg-{{ 'danger' if trend.trend_strength == 'high' else 'warning' if trend.trend_strength == 'medium' else 'secondary' }}">
                                 {{ trend.trend_strength|upper }}
                             </span>
@@ -129,7 +161,14 @@
                     </div>
                     <ul class="list-group list-group-flush">
                         {% for item in data.emerging_trends %}
-                        <li class="list-group-item">{{ item }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="emerging_trend" 
+                            data-insight-content='{{ item|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="emerging_{{ loop.index }}">
+                                <label class="form-check-label" for="emerging_{{ loop.index }}">{{ item }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -141,7 +180,14 @@
                     </div>
                     <ul class="list-group list-group-flush">
                         {% for item in data.declining_trends %}
-                        <li class="list-group-item">{{ item }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="declining_trend" 
+                            data-insight-content='{{ item|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="declining_{{ loop.index }}">
+                                <label class="form-check-label" for="declining_{{ loop.index }}">{{ item }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -162,10 +208,17 @@
                 <h5><i class="bi bi-exclamation-triangle text-warning me-2"></i>Major Pain Points</h5>
                 {% if data.major_pain_points %}
                 {% for point in data.major_pain_points %}
-                <div class="card mb-3">
+                <div class="card mb-3 insight-card selectable-insight" 
+                     data-insight-type="pain_point" 
+                     data-insight-content='{{ point|tojson|e }}'>
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start">
-                            <h6 class="card-title mb-1">{{ point.pain_point }}</h6>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="pain_{{ loop.index }}">
+                                <label class="form-check-label">
+                                    <h6 class="card-title mb-1">{{ point.pain_point }}</h6>
+                                </label>
+                            </div>
                             <span class="badge bg-{{ 'danger' if point.severity == 'high' else 'warning' if point.severity == 'medium' else 'secondary' }}">
                                 {{ point.severity|upper }}
                             </span>
@@ -183,7 +236,14 @@
                     <div class="card-header"><i class="bi bi-question-circle me-1"></i>Common Questions</div>
                     <ul class="list-group list-group-flush">
                         {% for q in data.common_questions %}
-                        <li class="list-group-item small">{{ q }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="common_question" 
+                            data-insight-content='{{ q|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="question_{{ loop.index }}">
+                                <label class="form-check-label small" for="question_{{ loop.index }}">{{ q }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -193,7 +253,14 @@
                     <div class="card-header"><i class="bi bi-x-circle me-1"></i>Misconceptions</div>
                     <ul class="list-group list-group-flush">
                         {% for m in data.misconceptions %}
-                        <li class="list-group-item small">{{ m }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="misconception" 
+                            data-insight-content='{{ m|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="misconception_{{ loop.index }}">
+                                <label class="form-check-label small" for="misconception_{{ loop.index }}">{{ m }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -203,7 +270,14 @@
                     <div class="card-header"><i class="bi bi-heart me-1"></i>Emotional Triggers</div>
                     <ul class="list-group list-group-flush">
                         {% for t in data.emotional_triggers %}
-                        <li class="list-group-item small">{{ t }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="emotional_trigger" 
+                            data-insight-content='{{ t|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="trigger_{{ loop.index }}">
+                                <label class="form-check-label small" for="trigger_{{ loop.index }}">{{ t }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -218,10 +292,17 @@
                 <h5><i class="bi bi-puzzle text-primary me-2"></i>Content Gaps</h5>
                 {% if data.content_gaps %}
                 {% for gap in data.content_gaps %}
-                <div class="card mb-3">
+                <div class="card mb-3 insight-card selectable-insight" 
+                     data-insight-type="content_gap" 
+                     data-insight-content='{{ gap|tojson|e }}'>
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start">
-                            <h6 class="card-title mb-1">{{ gap.gap }}</h6>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="gap_{{ loop.index }}">
+                                <label class="form-check-label">
+                                    <h6 class="card-title mb-1">{{ gap.gap }}</h6>
+                                </label>
+                            </div>
                             <span class="badge bg-{{ 'success' if gap.opportunity_size == 'high' else 'warning' if gap.opportunity_size == 'medium' else 'secondary' }}">
                                 {{ gap.opportunity_size|upper }} opportunity
                             </span>
@@ -241,7 +322,14 @@
                     </div>
                     <ul class="list-group list-group-flush">
                         {% for item in data.oversaturated_topics %}
-                        <li class="list-group-item small">{{ item }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="oversaturated_topic" 
+                            data-insight-content='{{ item|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="oversaturated_{{ loop.index }}">
+                                <label class="form-check-label small" for="oversaturated_{{ loop.index }}">{{ item }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -253,7 +341,14 @@
                     </div>
                     <ul class="list-group list-group-flush">
                         {% for item in data.unique_angles %}
-                        <li class="list-group-item small">{{ item }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="unique_angle" 
+                            data-insight-content='{{ item|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="unique_{{ loop.index }}">
+                                <label class="form-check-label small" for="unique_{{ loop.index }}">{{ item }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -268,9 +363,16 @@
                 <h5><i class="bi bi-people text-info me-2"></i>Top Performers</h5>
                 {% if data.top_performers %}
                 {% for performer in data.top_performers %}
-                <div class="card mb-3">
+                <div class="card mb-3 insight-card selectable-insight" 
+                     data-insight-type="competitor_learning" 
+                     data-insight-content='{{ performer|tojson|e }}'>
                     <div class="card-body">
-                        <h6 class="card-title">{{ performer.name }}</h6>
+                        <div class="form-check">
+                            <input class="form-check-input insight-checkbox" type="checkbox" id="performer_{{ loop.index }}">
+                            <label class="form-check-label">
+                                <h6 class="card-title">{{ performer.name }}</h6>
+                            </label>
+                        </div>
                         <p class="card-text"><strong>What Works:</strong> {{ performer.what_works }}</p>
                         <p class="card-text small"><strong>Style:</strong> {{ performer.content_style }}</p>
                         <div class="alert alert-info mb-0 py-2">
@@ -287,7 +389,14 @@
                     <div class="card-header"><i class="bi bi-grid me-1"></i>Popular Formats</div>
                     <ul class="list-group list-group-flush">
                         {% for f in data.common_formats %}
-                        <li class="list-group-item small">{{ f }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="content_format" 
+                            data-insight-content='{{ f|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="format_{{ loop.index }}">
+                                <label class="form-check-label small" for="format_{{ loop.index }}">{{ f }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -299,7 +408,14 @@
                     </div>
                     <ul class="list-group list-group-flush">
                         {% for d in data.differentiation_opportunities %}
-                        <li class="list-group-item small">{{ d }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="differentiation" 
+                            data-insight-content='{{ d|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="diff_{{ loop.index }}">
+                                <label class="form-check-label small" for="diff_{{ loop.index }}">{{ d }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -309,7 +425,14 @@
                     <div class="card-header"><i class="bi bi-check-circle me-1"></i>Best Practices</div>
                     <ul class="list-group list-group-flush">
                         {% for bp in data.best_practices %}
-                        <li class="list-group-item small">{{ bp }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="best_practice" 
+                            data-insight-content='{{ bp|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="bp_{{ loop.index }}">
+                                <label class="form-check-label small" for="bp_{{ loop.index }}">{{ bp }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -324,9 +447,16 @@
                 <h5><i class="bi bi-heart text-danger me-2"></i>High Engagement Patterns</h5>
                 {% if data.high_engagement_patterns %}
                 {% for pattern in data.high_engagement_patterns %}
-                <div class="card mb-3">
+                <div class="card mb-3 insight-card selectable-insight" 
+                     data-insight-type="engagement_pattern" 
+                     data-insight-content='{{ pattern|tojson|e }}'>
                     <div class="card-body">
-                        <h6 class="card-title">{{ pattern.pattern }}</h6>
+                        <div class="form-check">
+                            <input class="form-check-input insight-checkbox" type="checkbox" id="engagement_{{ loop.index }}">
+                            <label class="form-check-label">
+                                <h6 class="card-title">{{ pattern.pattern }}</h6>
+                            </label>
+                        </div>
                         <span class="badge bg-info mb-2">{{ pattern.engagement_type }}</span>
                         <p class="card-text small text-muted">{{ pattern.examples }}</p>
                         <p class="card-text"><strong>How to Apply:</strong> {{ pattern.application }}</p>
@@ -347,7 +477,14 @@
                     <div class="card-header"><i class="bi bi-megaphone me-1"></i>Effective Hooks</div>
                     <ul class="list-group list-group-flush">
                         {% for h in data.hook_styles %}
-                        <li class="list-group-item small">{{ h }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="hook_style" 
+                            data-insight-content='{{ h|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="hook_{{ loop.index }}">
+                                <label class="form-check-label small" for="hook_{{ loop.index }}">{{ h }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -357,7 +494,14 @@
                     <div class="card-header"><i class="bi bi-hand-index me-1"></i>CTA Patterns</div>
                     <ul class="list-group list-group-flush">
                         {% for cta in data.cta_patterns %}
-                        <li class="list-group-item small">{{ cta }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="cta_pattern" 
+                            data-insight-content='{{ cta|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="cta_{{ loop.index }}">
+                                <label class="form-check-label small" for="cta_{{ loop.index }}">{{ cta }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -381,6 +525,7 @@
                     <table class="table table-hover">
                         <thead>
                             <tr>
+                                <th style="width: 40px;"></th>
                                 <th>Keyword</th>
                                 <th>Intent</th>
                                 <th>Competition</th>
@@ -389,7 +534,12 @@
                         </thead>
                         <tbody>
                             {% for kw in data.high_value_keywords %}
-                            <tr>
+                            <tr class="selectable-insight-row" 
+                                data-insight-type="keyword" 
+                                data-insight-content='{{ kw|tojson|e }}'>
+                                <td>
+                                    <input class="form-check-input insight-checkbox" type="checkbox" id="keyword_{{ loop.index }}">
+                                </td>
                                 <td><strong>{{ kw.keyword }}</strong></td>
                                 <td><span class="badge bg-secondary">{{ kw.search_intent }}</span></td>
                                 <td>
@@ -406,9 +556,16 @@
                 {% endif %}
                 
                 {% if data.geo_optimization %}
-                <div class="card mt-4 border-info">
+                <div class="card mt-4 border-info insight-card selectable-insight" 
+                     data-insight-type="geo_optimization" 
+                     data-insight-content='{{ data.geo_optimization|tojson|e }}'>
                     <div class="card-header bg-info text-white">
-                        <i class="bi bi-robot me-1"></i>GEO (Generative Engine Optimization)
+                        <div class="form-check">
+                            <input class="form-check-input insight-checkbox" type="checkbox" id="geo_main">
+                            <label class="form-check-label">
+                                <i class="bi bi-robot me-1"></i>GEO (Generative Engine Optimization)
+                            </label>
+                        </div>
                     </div>
                     <div class="card-body">
                         {% if data.geo_optimization.ai_friendly_topics %}
@@ -430,7 +587,14 @@
                     <div class="card-header"><i class="bi bi-list me-1"></i>Long-Tail Keywords</div>
                     <ul class="list-group list-group-flush">
                         {% for lt in data.long_tail_opportunities %}
-                        <li class="list-group-item small">{{ lt }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="long_tail_keyword" 
+                            data-insight-content='{{ lt|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="longtail_{{ loop.index }}">
+                                <label class="form-check-label small" for="longtail_{{ loop.index }}">{{ lt }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -440,7 +604,14 @@
                     <div class="card-header"><i class="bi bi-question-circle me-1"></i>Question Keywords</div>
                     <ul class="list-group list-group-flush">
                         {% for q in data.question_keywords %}
-                        <li class="list-group-item small">{{ q }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="question_keyword" 
+                            data-insight-content='{{ q|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="question_{{ loop.index }}">
+                                <label class="form-check-label small" for="question_{{ loop.index }}">{{ q }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -451,9 +622,16 @@
         <!-- Strategic Recommendations -->
         {% elif analysis_type == 'strategic_recommendations' %}
         {% if data.content_strategy %}
-        <div class="card mb-4 border-primary">
+        <div class="card mb-4 border-primary insight-card selectable-insight" 
+             data-insight-type="content_strategy" 
+             data-insight-content='{{ data.content_strategy|tojson|e }}'>
             <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-compass me-2"></i>Content Strategy</h5>
+                <div class="form-check">
+                    <input class="form-check-input insight-checkbox" type="checkbox" id="strategy_main">
+                    <label class="form-check-label">
+                        <h5 class="mb-0"><i class="bi bi-compass me-2"></i>Content Strategy</h5>
+                    </label>
+                </div>
             </div>
             <div class="card-body">
                 <div class="row">
@@ -466,7 +644,14 @@
                         <strong>Content Pillars:</strong>
                         <ul>
                             {% for pillar in data.content_strategy.content_pillars %}
-                            <li>{{ pillar }}</li>
+                            <li class="selectable-insight-item" 
+                                data-insight-type="content_pillar" 
+                                data-insight-content='{{ pillar|tojson|e }}'>
+                                <div class="form-check d-inline-block">
+                                    <input class="form-check-input insight-checkbox" type="checkbox" id="pillar_{{ loop.index }}">
+                                    <label class="form-check-label" for="pillar_{{ loop.index }}">{{ pillar }}</label>
+                                </div>
+                            </li>
                             {% endfor %}
                         </ul>
                     </div>
@@ -480,10 +665,17 @@
                 <h5><i class="bi bi-rocket text-success me-2"></i>Growth Opportunities</h5>
                 {% if data.growth_opportunities %}
                 {% for opp in data.growth_opportunities %}
-                <div class="card mb-3">
+                <div class="card mb-3 insight-card selectable-insight" 
+                     data-insight-type="growth_opportunity" 
+                     data-insight-content='{{ opp|tojson|e }}'>
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <h6 class="card-title mb-0">{{ opp.opportunity }}</h6>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="growth_{{ loop.index }}">
+                                <label class="form-check-label">
+                                    <h6 class="card-title mb-0">{{ opp.opportunity }}</h6>
+                                </label>
+                            </div>
                             <div>
                                 <span class="badge bg-{{ 'success' if opp.potential_impact == 'high' else 'warning' if opp.potential_impact == 'medium' else 'secondary' }} me-1">
                                     {{ opp.potential_impact }} impact
@@ -515,7 +707,14 @@
                     </div>
                     <ul class="list-group list-group-flush">
                         {% for qw in data.quick_wins %}
-                        <li class="list-group-item small">{{ qw }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="quick_win" 
+                            data-insight-content='{{ qw|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="quickwin_{{ loop.index }}">
+                                <label class="form-check-label small" for="quickwin_{{ loop.index }}">{{ qw }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -527,7 +726,14 @@
                     </div>
                     <ul class="list-group list-group-flush">
                         {% for ltp in data.long_term_plays %}
-                        <li class="list-group-item small">{{ ltp }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="long_term_play" 
+                            data-insight-content='{{ ltp|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="longterm_{{ loop.index }}">
+                                <label class="form-check-label small" for="longterm_{{ loop.index }}">{{ ltp }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -539,7 +745,14 @@
                     </div>
                     <ul class="list-group list-group-flush">
                         {% for risk in data.risks_to_avoid %}
-                        <li class="list-group-item small">{{ risk }}</li>
+                        <li class="list-group-item selectable-insight-item" 
+                            data-insight-type="risk_to_avoid" 
+                            data-insight-content='{{ risk|tojson|e }}'>
+                            <div class="form-check">
+                                <input class="form-check-input insight-checkbox" type="checkbox" id="risk_{{ loop.index }}">
+                                <label class="form-check-label small" for="risk_{{ loop.index }}">{{ risk }}</label>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -570,4 +783,396 @@
         </div>
     </div>
 </div>
+
+<!-- Generate Content Modal -->
+<div class="modal fade" id="generateContentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-magic me-2"></i>Generate Content from Insights</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Configuration Form -->
+                <div id="configForm">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        You have selected <strong id="modalSelectedCount">0</strong> insights to generate content from.
+                    </div>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="ideasCount" class="form-label">Number of Ideas to Generate</label>
+                            <select class="form-select" id="ideasCount">
+                                <option value="3">3 ideas</option>
+                                <option value="5" selected>5 ideas</option>
+                                <option value="7">7 ideas</option>
+                                <option value="10">10 ideas</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Options</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="generateScripts" checked>
+                                <label class="form-check-label" for="generateScripts">
+                                    Also generate full scripts for each idea
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h6 class="mt-4 mb-3">Selected Insights Preview:</h6>
+                    <div id="selectedInsightsPreview" class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Progress Section (hidden by default) -->
+                <div id="progressSection" class="d-none">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-success mb-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h5 id="progressMessage">Generating content...</h5>
+                        <div class="progress mt-3" style="height: 25px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                 id="progressBar" role="progressbar" style="width: 0%">0%</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Result Section (hidden by default) -->
+                <div id="resultSection" class="d-none">
+                    <div class="text-center py-4">
+                        <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+                        <h4 class="mt-3">Content Generated Successfully!</h4>
+                        <p class="text-muted" id="resultSummary"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="btnStartGeneration">
+                    <i class="bi bi-lightning-charge me-1"></i>Generate Content
+                </button>
+                <a href="#" class="btn btn-primary d-none" id="btnViewContent">
+                    <i class="bi bi-eye me-1"></i>View Generated Content
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .selectable-insight {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .selectable-insight:hover {
+        border-color: #198754 !important;
+        box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.15);
+    }
+    .selectable-insight.selected {
+        border-color: #198754 !important;
+        border-width: 2px;
+        background-color: rgba(25, 135, 84, 0.05);
+    }
+    .selectable-insight-item {
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    .selectable-insight-item:hover {
+        background-color: rgba(25, 135, 84, 0.1);
+    }
+    .selectable-insight-item.selected {
+        background-color: rgba(25, 135, 84, 0.15);
+    }
+    .selectable-insight-row {
+        cursor: pointer;
+    }
+    .selectable-insight-row:hover {
+        background-color: rgba(25, 135, 84, 0.1) !important;
+    }
+    .selectable-insight-row.selected {
+        background-color: rgba(25, 135, 84, 0.15) !important;
+    }
+    .insight-checkbox {
+        transform: scale(1.2);
+    }
+    #selectedInsightsPreview .insight-tag {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        margin: 0.25rem;
+        background-color: #e9ecef;
+        border-radius: 0.25rem;
+        font-size: 0.875rem;
+    }
+    #selectedInsightsPreview .insight-tag .type-badge {
+        font-size: 0.75rem;
+        margin-right: 0.25rem;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const personaId = '{{ persona_id }}';
+    let selectedInsights = [];
+    
+    // DOM elements
+    const btnGenerateContent = document.getElementById('btnGenerateContent');
+    const selectedCountBadge = document.getElementById('selectedCount');
+    const btnSelectAll = document.getElementById('btnSelectAll');
+    const btnDeselectAll = document.getElementById('btnDeselectAll');
+    const modal = new bootstrap.Modal(document.getElementById('generateContentModal'));
+    const modalSelectedCount = document.getElementById('modalSelectedCount');
+    const selectedInsightsPreview = document.getElementById('selectedInsightsPreview');
+    const configForm = document.getElementById('configForm');
+    const progressSection = document.getElementById('progressSection');
+    const resultSection = document.getElementById('resultSection');
+    const btnStartGeneration = document.getElementById('btnStartGeneration');
+    const btnViewContent = document.getElementById('btnViewContent');
+    
+    // Select All button
+    btnSelectAll.addEventListener('click', function() {
+        // Get all visible checkboxes in the active tab
+        const activeTabPane = document.querySelector('.tab-pane.active');
+        if (activeTabPane) {
+            activeTabPane.querySelectorAll('.insight-checkbox:not(:checked)').forEach(checkbox => {
+                checkbox.checked = true;
+                const parent = checkbox.closest('.selectable-insight, .selectable-insight-item, .selectable-insight-row');
+                if (parent) {
+                    updateInsightSelection(parent, true);
+                }
+            });
+        }
+        updateSelectButtons();
+    });
+    
+    // Deselect All button
+    btnDeselectAll.addEventListener('click', function() {
+        document.querySelectorAll('.insight-checkbox:checked').forEach(checkbox => {
+            checkbox.checked = false;
+            const parent = checkbox.closest('.selectable-insight, .selectable-insight-item, .selectable-insight-row');
+            if (parent) {
+                parent.classList.remove('selected');
+            }
+        });
+        selectedInsights = [];
+        updateUI();
+        updateSelectButtons();
+    });
+    
+    function updateSelectButtons() {
+        const hasSelections = selectedInsights.length > 0;
+        if (hasSelections) {
+            btnSelectAll.classList.add('d-none');
+            btnDeselectAll.classList.remove('d-none');
+        } else {
+            btnSelectAll.classList.remove('d-none');
+            btnDeselectAll.classList.add('d-none');
+        }
+    }
+    
+    // Handle checkbox changes
+    document.querySelectorAll('.insight-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function(e) {
+            e.stopPropagation();
+            const parent = this.closest('.selectable-insight, .selectable-insight-item, .selectable-insight-row');
+            if (parent) {
+                updateInsightSelection(parent, this.checked);
+            }
+            updateSelectButtons();
+        });
+    });
+    
+    // Handle card/row clicks
+    document.querySelectorAll('.selectable-insight, .selectable-insight-item, .selectable-insight-row').forEach(element => {
+        element.addEventListener('click', function(e) {
+            // Don't toggle if clicking on the checkbox itself
+            if (e.target.classList.contains('insight-checkbox')) return;
+            
+            const checkbox = this.querySelector('.insight-checkbox');
+            if (checkbox) {
+                checkbox.checked = !checkbox.checked;
+                updateInsightSelection(this, checkbox.checked);
+                updateSelectButtons();
+            }
+        });
+    });
+    
+    function updateInsightSelection(element, isSelected) {
+        const insightType = element.dataset.insightType;
+        let insightContent;
+        
+        try {
+            insightContent = JSON.parse(element.dataset.insightContent);
+        } catch (e) {
+            insightContent = element.dataset.insightContent;
+        }
+        
+        if (isSelected) {
+            element.classList.add('selected');
+            selectedInsights.push({
+                type: insightType,
+                content: insightContent
+            });
+        } else {
+            element.classList.remove('selected');
+            // Remove from selected
+            selectedInsights = selectedInsights.filter(i => {
+                if (typeof i.content === 'string' && typeof insightContent === 'string') {
+                    return i.content !== insightContent;
+                }
+                return JSON.stringify(i.content) !== JSON.stringify(insightContent);
+            });
+        }
+        
+        updateUI();
+    }
+    
+    function updateUI() {
+        const count = selectedInsights.length;
+        
+        // Update count badge
+        if (count > 0) {
+            selectedCountBadge.textContent = count + ' selected';
+            selectedCountBadge.classList.remove('d-none');
+            btnGenerateContent.disabled = false;
+        } else {
+            selectedCountBadge.classList.add('d-none');
+            btnGenerateContent.disabled = true;
+        }
+    }
+    
+    // Open modal
+    btnGenerateContent.addEventListener('click', function() {
+        modalSelectedCount.textContent = selectedInsights.length;
+        
+        // Build preview
+        selectedInsightsPreview.innerHTML = '';
+        selectedInsights.forEach(insight => {
+            const tag = document.createElement('div');
+            tag.className = 'insight-tag';
+            
+            const typeBadge = document.createElement('span');
+            typeBadge.className = 'type-badge badge bg-secondary';
+            typeBadge.textContent = insight.type.replace('_', ' ');
+            
+            const title = document.createElement('span');
+            if (typeof insight.content === 'string') {
+                title.textContent = insight.content.substring(0, 50) + (insight.content.length > 50 ? '...' : '');
+            } else {
+                const displayText = insight.content.topic || insight.content.pain_point || 
+                                   insight.content.gap || insight.content.keyword || 
+                                   insight.content.pattern || JSON.stringify(insight.content).substring(0, 50);
+                title.textContent = displayText;
+            }
+            
+            tag.appendChild(typeBadge);
+            tag.appendChild(title);
+            selectedInsightsPreview.appendChild(tag);
+        });
+        
+        // Reset modal state
+        configForm.classList.remove('d-none');
+        progressSection.classList.add('d-none');
+        resultSection.classList.add('d-none');
+        btnStartGeneration.classList.remove('d-none');
+        btnViewContent.classList.add('d-none');
+        
+        modal.show();
+    });
+    
+    // Start generation
+    btnStartGeneration.addEventListener('click', async function() {
+        const ideasCount = parseInt(document.getElementById('ideasCount').value);
+        const generateScripts = document.getElementById('generateScripts').checked;
+        
+        // Show progress
+        configForm.classList.add('d-none');
+        progressSection.classList.remove('d-none');
+        btnStartGeneration.disabled = true;
+        
+        try {
+            // Start generation
+            const response = await fetch('/api/insights/generate-content', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    persona_id: personaId,
+                    selected_insights: selectedInsights,
+                    ideas_count: ideasCount,
+                    generate_scripts: generateScripts
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            // Poll for status
+            const jobId = data.job_id;
+            pollJobStatus(jobId);
+            
+        } catch (error) {
+            alert('Error starting generation: ' + error.message);
+            configForm.classList.remove('d-none');
+            progressSection.classList.add('d-none');
+            btnStartGeneration.disabled = false;
+        }
+    });
+    
+    async function pollJobStatus(jobId) {
+        const progressBar = document.getElementById('progressBar');
+        const progressMessage = document.getElementById('progressMessage');
+        
+        const poll = async () => {
+            try {
+                const response = await fetch(`/api/insights/generate-content/${jobId}/status`);
+                const status = await response.json();
+                
+                if (status.error) {
+                    throw new Error(status.error);
+                }
+                
+                // Update progress
+                progressBar.style.width = status.progress + '%';
+                progressBar.textContent = status.progress + '%';
+                progressMessage.textContent = status.message;
+                
+                if (status.status === 'completed') {
+                    // Show result
+                    progressSection.classList.add('d-none');
+                    resultSection.classList.remove('d-none');
+                    btnStartGeneration.classList.add('d-none');
+                    btnViewContent.classList.remove('d-none');
+                    
+                    document.getElementById('resultSummary').textContent = 
+                        `Generated ${status.result.ideas_count} ideas and ${status.result.scripts_count} scripts`;
+                    
+                    btnViewContent.href = `/content/${personaId}/${status.result.filename}`;
+                    
+                } else if (status.status === 'failed') {
+                    throw new Error(status.message);
+                } else {
+                    // Continue polling
+                    setTimeout(poll, 1000);
+                }
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+                configForm.classList.remove('d-none');
+                progressSection.classList.add('d-none');
+                btnStartGeneration.disabled = false;
+            }
+        };
+        
+        poll();
+    }
+});
+</script>
 {% endblock %}

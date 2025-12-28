@@ -70,6 +70,8 @@
                         </a>
                         {% if script.is_manual %}
                         <span class="badge bg-info ms-2" title="Manually added"><i class="bi bi-pencil-square"></i> Manual</span>
+                        {% elif script.source == 'insights' %}
+                        <span class="badge bg-success ms-2" title="Generated from Insights"><i class="bi bi-lightbulb"></i> From Insights</span>
                         {% endif %}
                     </td>
                     <td>
@@ -105,6 +107,8 @@
                         </a>
                         {% if script.is_manual %}
                         <span class="badge bg-info ms-2" title="Manually added"><i class="bi bi-pencil-square"></i> Manual</span>
+                        {% elif script.source == 'insights' %}
+                        <span class="badge bg-success ms-2" title="Generated from Insights"><i class="bi bi-lightbulb"></i> From Insights</span>
                         {% endif %}
                     </h6>
                     <p class="card-text small text-muted">{{ (script.full_script or script.main_content or script.script or script.content or '')[:120] }}...</p>

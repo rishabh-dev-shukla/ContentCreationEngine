@@ -1018,6 +1018,142 @@ def api_insights_status(job_id):
     return jsonify(insights_jobs[job_id])
 
 
+# Global state for insights-to-content jobs
+insights_content_jobs = {}
+
+
+@app.route('/api/insights/generate-content', methods=['POST'])
+@login_required
+def api_generate_content_from_insights():
+    """API: Generate content from selected insights."""
+    from src.content_creation_engine.generators import InsightsContentGenerator
+    from src.content_creation_engine.persona import PersonaManager
+    
+    data = request.json
+    
+    persona_id = data.get('persona_id')
+    if not persona_id:
+        return jsonify({'error': 'Missing persona_id'}), 400
+    
+    selected_insights = data.get('selected_insights', [])
+    if not selected_insights:
+        return jsonify({'error': 'No insights selected'}), 400
+    
+    ideas_count = data.get('ideas_count', 5)
+    generate_scripts = data.get('generate_scripts', True)
+    
+    # Capture customer_id before starting thread (must be done in request context)
+    customer_id = get_current_customer_id()
+    
+    # Load persona now while we're still in request context
+    try:
+        manager = get_persona_manager(customer_id=customer_id)
+        persona = manager.load_persona(persona_id)
+        if not persona:
+            return jsonify({'error': f'Persona {persona_id} not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error loading persona: {str(e)}'}), 500
+    
+    # Create a unique job ID
+    job_id = f"insights_content_{persona_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
+    # Mark job as running
+    insights_content_jobs[job_id] = {
+        'status': 'running',
+        'persona_id': persona_id,
+        'started_at': datetime.now().isoformat(),
+        'progress': 0,
+        'message': 'Starting content generation from insights...',
+        'insights_count': len(selected_insights)
+    }
+    
+    def run_generation():
+        try:
+            insights_content_jobs[job_id]['message'] = 'Generating content ideas...'
+            insights_content_jobs[job_id]['progress'] = 20
+            
+            generator = InsightsContentGenerator()
+            result = generator.generate_content_from_insights(
+                selected_insights=selected_insights,
+                persona=persona,
+                ideas_count=ideas_count,
+                generate_scripts=generate_scripts
+            )
+            
+            insights_content_jobs[job_id]['message'] = 'Saving generated content...'
+            insights_content_jobs[job_id]['progress'] = 90
+            
+            # Generate output ID
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            output_id = f"{timestamp}_insights_content"
+            
+            # Add metadata to result for consistency with regular content
+            result['date'] = datetime.now().strftime("%Y-%m-%d")
+            result['niche'] = persona.get('basic_info', {}).get('niche', '')
+            
+            # Save to Firebase if customer is logged in
+            if customer_id:
+                try:
+                    from src.content_creation_engine.utils.firebase_service import get_firebase_service
+                    firebase = get_firebase_service()
+                    if firebase:
+                        firebase.save_content_output(
+                            customer_id=customer_id,
+                            persona_id=persona_id,
+                            content=result,
+                            output_id=output_id
+                        )
+                        logger.info(f"Content saved to Firebase: {customer_id}/{persona_id}/{output_id}")
+                except Exception as e:
+                    logger.error(f"Error saving to Firebase: {e}")
+            
+            # Also save to local file as backup
+            output_dir = settings.output_dir / persona_id
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            filename = f"{output_id}.json"
+            output_file = output_dir / filename
+            
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(result, f, indent=2, ensure_ascii=False)
+            
+            insights_content_jobs[job_id]['status'] = 'completed'
+            insights_content_jobs[job_id]['progress'] = 100
+            insights_content_jobs[job_id]['message'] = 'Content generation completed!'
+            insights_content_jobs[job_id]['result'] = {
+                'ideas_count': len(result.get('content_ideas', [])),
+                'scripts_count': len(result.get('scripts', [])),
+                'output_file': str(output_file),
+                'filename': output_id  # Return without .json for URL consistency
+            }
+            
+            # Clear cache (using customer_id captured before thread started)
+            if customer_id:
+                cache.delete(f'content_list_{customer_id}_all')
+                cache.delete(f'content_list_{customer_id}_{persona_id}')
+            
+        except Exception as e:
+            logger.error(f"Insights content generation error: {e}")
+            insights_content_jobs[job_id]['status'] = 'failed'
+            insights_content_jobs[job_id]['message'] = str(e)
+    
+    # Run in background thread
+    thread = Thread(target=run_generation)
+    thread.start()
+    
+    return jsonify({'job_id': job_id, 'status': 'started'})
+
+
+@app.route('/api/insights/generate-content/<job_id>/status', methods=['GET'])
+@login_required
+def api_insights_content_status(job_id):
+    """API: Get insights content generation job status."""
+    if job_id not in insights_content_jobs:
+        return jsonify({'error': 'Job not found'}), 404
+    
+    return jsonify(insights_content_jobs[job_id])
+
+
 @app.route('/api/insights', methods=['GET'])
 @login_required
 def api_list_insights():
