@@ -13,6 +13,7 @@ from functools import wraps
 from threading import Thread
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, g
+from flask_caching import Cache
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -37,6 +38,9 @@ app = Flask(__name__,
             static_folder='static')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
 app.permanent_session_lifetime = timedelta(days=7)
+
+# Configure caching (simple in-memory cache)
+cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
 
 # Firebase configuration for client-side SDK
 FIREBASE_CONFIG = {
@@ -143,6 +147,12 @@ def get_all_content_outputs(persona_id: str = None) -> list:
     
     # If we have a customer context, use Firebase
     if customer_id:
+        # Use cache for content list
+        cache_key = f'content_list_{customer_id}_{persona_id or "all"}'
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+        
         from src.content_creation_engine.utils.firebase_service import get_firebase_service
         firebase = get_firebase_service()
         if firebase:
@@ -152,6 +162,8 @@ def get_all_content_outputs(persona_id: str = None) -> list:
                     persona_id=persona_id,
                     limit=100
                 )
+                # Cache for 2 minutes
+                cache.set(cache_key, outputs, timeout=120)
                 return outputs
             except Exception as e:
                 logger.error(f"Error getting content from Firebase: {e}")
@@ -339,6 +351,15 @@ def api_verify_auth():
 @login_required
 def index():
     """Dashboard home page."""
+    customer_id = get_current_customer_id()
+    cache_key = f'dashboard_stats_{customer_id}' if customer_id else 'dashboard_stats_local'
+    
+    # Try to get cached stats
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return render_template('index.html', **cached_data)
+    
+    # Compute stats
     manager = get_persona_manager()
     personas = manager.list_personas()
     
@@ -356,13 +377,18 @@ def index():
     # Get insights count
     all_insights = get_all_insights()
     
-    return render_template('index.html',
-                          personas=personas,
-                          recent_content=recent_content,
-                          total_ideas=total_ideas,
-                          total_scripts=total_scripts,
-                          research_count=len(research_data),
-                          insights_count=len(all_insights))
+    # Cache the result for 5 minutes
+    data = {
+        'personas': personas,
+        'recent_content': recent_content,
+        'total_ideas': total_ideas,
+        'total_scripts': total_scripts,
+        'research_count': len(research_data),
+        'insights_count': len(all_insights)
+    }
+    cache.set(cache_key, data, timeout=300)
+    
+    return render_template('index.html', **data)
 
 
 # Scripts page for a persona
@@ -829,6 +855,13 @@ def api_generate_content():
                 'visuals_count': len(output.visuals),
                 'output_file': output.metadata.get('output_file', '')
             }
+            
+            # Clear cache for this customer/persona to show new content
+            customer_id = get_current_customer_id()
+            if customer_id:
+                cache.delete(f'content_list_{customer_id}_all')
+                cache.delete(f'content_list_{customer_id}_{persona_id}')
+                cache.delete(f'dashboard_stats_{customer_id}')
             
             # Restore original provider
             if ai_provider != original_provider:
@@ -1567,6 +1600,26 @@ def server_error(e):
 
 # =============================================================================
 # Main
+# =============================================================================
+
+# =============================================================================
+# Utility Routes
+# =============================================================================
+
+@app.route('/api/cache/clear', methods=['POST'])
+@login_required
+def clear_cache():
+    """Clear the application cache."""
+    try:
+        cache.clear()
+        return jsonify({'success': True, 'message': 'Cache cleared successfully'})
+    except Exception as e:
+        logger.error(f"Error clearing cache: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# =============================================================================
+# App Factory
 # =============================================================================
 
 def create_app():
